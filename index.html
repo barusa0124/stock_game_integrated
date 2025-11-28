@@ -96,16 +96,26 @@
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="card p-4 lg:col-span-2 flex flex-col h-[450px]">
-          <div class="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+        <div class="card p-4 lg:col-span-2 flex flex-col h-auto lg:h-[500px]">
+          <div class="flex justify-between items-center mb-2 border-b border-gray-100 pb-2">
             <h2 class="text-lg font-bold text-gray-800">市場トレンド</h2>
             <select id="time-range-selector" class="text-sm border-gray-300 rounded shadow-sm py-1">
               </select>
           </div>
-          <div class="flex-1 relative min-h-0">
-            <canvas id="combined-chart"></canvas>
+          
+          <div class="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+              
+              <div class="flex-1 relative w-full h-[300px] lg:h-full min-h-0">
+                <canvas id="combined-chart"></canvas>
+              </div>
+
+              <div class="w-full lg:w-48 lg:border-l lg:pl-4 border-gray-200 overflow-y-auto">
+                  <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">Tickers (Click to Toggle)</h3>
+                  <div id="chart-legend" class="grid grid-cols-2 lg:flex lg:flex-col gap-2">
+                      </div>
+              </div>
+
           </div>
-          <div id="price-ticker" class="mt-4 flex gap-4 overflow-x-auto pb-2 scrollbar-hide"></div>
         </div>
 
         <div class="space-y-6">
@@ -172,10 +182,11 @@
         password: "entry.625519360"
       };
 
-      // 修正: 株価データもGASから取得するため、GASのAPI URLにパラメータを付与して使用
       const STOCK_DATA_URL = `${GAS_API_URL}?type=stock`; 
       
-      const UPDATE_INTERVAL = 5000;
+      // ★修正: 更新頻度を10秒に変更
+      const UPDATE_INTERVAL = 10000;
+      
       const TIME_RANGE_OPTIONS = [
           { label: '5分', value: 5 }, { label: '10分', value: 10 },
           { label: '30分', value: 30 }, { label: '60分', value: 60 }
@@ -186,8 +197,8 @@
         pricesSchedule: [],
         eventsSchedule: [],
         activeStocks: new Set(),
-        playerInfo: null, // GASから取得したデータ
-        currentPrices: {}, // 銘柄名: 価格 のマップ
+        playerInfo: null, 
+        currentPrices: {}, 
         chart: null,
         historyMinutes: 10,
         stockColors: {},
@@ -199,7 +210,6 @@
       // --- 初期化 & ログイン ---
       const loginForm = document.getElementById('login-form');
       
-      // セッション復帰
       const savedPlayer = sessionStorage.getItem('stock_game_player');
       const savedPass = sessionStorage.getItem('stock_game_pass');
       if(savedPlayer && savedPass) {
@@ -227,42 +237,28 @@
         document.getElementById('dashboard-screen').classList.remove('hidden');
         document.getElementById('display-player-name').textContent = name;
         
-        // 初回ロード
         updateAllData();
-        // 定期実行
         setInterval(updateAllData, UPDATE_INTERVAL);
         
         initTimeRangeSelector();
       }
 
-      // --- データ取得 (統合版) ---
+      // --- データ取得 ---
       async function updateAllData() {
         const playerName = sessionStorage.getItem('stock_game_player');
         const password = sessionStorage.getItem('stock_game_pass');
 
         try {
-          // 1. 株価データ取得 (GAS APIから直接取得)
-          // redirect: 'follow' がGASウェブアプリへのアクセスには必須
-          const stockRes = await fetch(`${STOCK_DATA_URL}&t=${Date.now()}`, {
-             method: 'GET',
-             redirect: 'follow'
-          });
-          
+          const stockRes = await fetch(`${STOCK_DATA_URL}&t=${Date.now()}`, { method: 'GET', redirect: 'follow' });
           if (!stockRes.ok) throw new Error("Stock data fetch failed");
-          
           const stockJson = await stockRes.json();
-          
           if(stockJson && stockJson[0]) {
             processStockData(stockJson[0]);
           }
 
-          // 2. プレイヤーデータ取得 (GAS API)
           if (playerName && password) {
              const params = new URLSearchParams({ playerName, password });
-             const playerRes = await fetch(`${GAS_API_URL}?${params.toString()}`, {
-                method: 'GET',
-                redirect: 'follow'
-             });
+             const playerRes = await fetch(`${GAS_API_URL}?${params.toString()}`, { method: 'GET', redirect: 'follow' });
              const playerJson = await playerRes.json();
 
              if(playerJson.success) {
@@ -272,8 +268,6 @@
                console.warn("Auth failed or API error:", playerJson.message);
              }
           }
-          
-          // UI更新時刻
           document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ja-JP');
 
         } catch (e) {
@@ -281,15 +275,13 @@
         }
       }
 
-      // --- データ処理: 株価 ---
+      // --- データ処理 ---
       function processStockData(data) {
-        // データ整形
         state.pricesSchedule = data.prices_schedule.map(d => ({...d, time_date: new Date(d.time_absolute_iso)}));
         state.pricesSchedule.sort((a,b) => a.time_date - b.time_date);
         
         state.eventsSchedule = data.events_schedule.map(d => ({...d, time_date: new Date(d.time_absolute_iso)}));
         
-        // 最新価格マップの作成
         const now = new Date();
         const latestEntry = [...state.pricesSchedule].reverse().find(e => e.time_date <= now);
         
@@ -297,15 +289,13 @@
           latestEntry.prices.forEach(p => {
             state.currentPrices[p.name] = p.price;
           });
-          
-          // 初回のみアクティブ銘柄設定
           if(state.activeStocks.size === 0) {
             latestEntry.prices.forEach(p => state.activeStocks.add(p.name));
           }
         }
 
         updateChart();
-        updateTicker();
+        updateLegend(); // 凡例更新
         updateEvents(now);
       }
 
@@ -317,7 +307,6 @@
         
         const filtered = state.pricesSchedule.filter(d => d.time_date.getTime() >= (now - rangeMs) && d.time_date.getTime() <= now);
         
-        // 銘柄ごとにデータセット作成
         const stockNames = Object.keys(state.currentPrices);
         const datasets = stockNames.map(name => {
           const color = getColor(name);
@@ -333,7 +322,6 @@
           };
         });
 
-        // Y軸スケール計算
         let allValues = filtered.flatMap(d => d.prices.filter(p => state.activeStocks.has(p.name)).map(p => p.price));
         if(allValues.length === 0) allValues = [1000];
         const minVal = Math.min(...allValues);
@@ -363,16 +351,39 @@
         }
       }
 
-      // --- UI描画: プレイヤー情報 (ポートフォリオ) ---
+      // --- ★追加: 凡例 (Custom Legend) ---
+      function updateLegend() {
+        const legendContainer = document.getElementById('chart-legend');
+        legendContainer.innerHTML = '';
+        
+        Object.entries(state.currentPrices).forEach(([name, price]) => {
+          const item = document.createElement('div');
+          // スタイル: アクティブなら白背景+ボーダー、非アクティブなら薄く
+          const isActive = state.activeStocks.has(name);
+          const color = getColor(name);
+          
+          item.className = `p-2 rounded border cursor-pointer transition select-none flex justify-between items-center ${isActive ? 'bg-white border-gray-200 shadow-sm' : 'bg-gray-100 border-transparent opacity-60'}`;
+          item.onclick = () => toggleStock(name);
+          
+          item.innerHTML = `
+            <div class="flex items-center gap-2 overflow-hidden">
+                <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${color}"></span>
+                <span class="text-xs font-bold text-gray-700 truncate">${name}</span>
+            </div>
+            <span class="text-xs font-mono text-gray-900 ml-1">¥${price.toLocaleString()}</span>
+          `;
+          legendContainer.appendChild(item);
+        });
+      }
+
+      // --- UI描画: ポートフォリオ ---
       function updatePortfolioUI() {
         if (!state.playerInfo) return;
         const p = state.playerInfo;
 
-        // 1. 資産カード
         document.getElementById('total-assets').textContent = `¥ ${p.totalAssets.toLocaleString()}`;
         document.getElementById('cash-assets').textContent = `¥ ${p.cash.toLocaleString()}`;
 
-        // 2. メッセージ
         const msgList = document.getElementById('message-list');
         if(p.messages && p.messages.length > 0) {
           msgList.innerHTML = p.messages.map(m => `<li class="border-b border-yellow-100 pb-1 last:border-0">${m}</li>`).join('');
@@ -380,32 +391,24 @@
           msgList.innerHTML = '<li class="text-gray-400 text-xs">新着メッセージはありません</li>';
         }
 
-        // 3. 一括注文ボタンリンク生成
         const baseParams = `&${FIELD_IDS.playerName}=${encodeURIComponent(p.playerName)}&${FIELD_IDS.password}=${encodeURIComponent(p.password)}`;
         const bulkLink = `${VIEW_FORM_URL}?${FIELD_IDS.entryType}=&${FIELD_IDS.stockName}=${baseParams}`;
         document.getElementById('bulk-order-btn').href = bulkLink;
 
-        // 4. テーブル描画
         const tbody = document.getElementById('portfolio-table-body');
         let html = '';
         
         p.stockNames.forEach((name, i) => {
-          if(!name) return; // 空欄スキップ
-          
+          if(!name) return;
           const holding = p.stockHoldings[i];
           const currentPrice = state.currentPrices[name] || 0;
           const valuation = holding * currentPrice;
           
-          // 注文リンク生成
           const encodedName = encodeURIComponent(name);
           const buyUrl = `${FORM_BASE_URL}?${FIELD_IDS.entryType}=${encodeURIComponent('買')}&${FIELD_IDS.stockName}=${encodedName}${baseParams}`;
           const sellUrl = `${FORM_BASE_URL}?${FIELD_IDS.entryType}=${encodeURIComponent('売')}&${FIELD_IDS.stockName}=${encodedName}&${FIELD_IDS.quantity}=${holding}${baseParams}`;
-
-          // 売りボタンの状態
           const sellDisabled = holding <= 0;
-          const sellClass = sellDisabled 
-            ? "bg-gray-200 text-gray-400 cursor-not-allowed" 
-            : "bg-red-50 text-red-600 hover:bg-red-100";
+          const sellClass = sellDisabled ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-red-50 text-red-600 hover:bg-red-100";
 
           html += `
             <tr class="hover:bg-gray-50 transition">
@@ -415,15 +418,9 @@
                   <div class="text-sm font-bold text-gray-900">${name}</div>
                 </div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600">
-                ¥ ${currentPrice.toLocaleString()}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-800">
-                ${holding.toLocaleString()} 株
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-mono text-gray-600">
-                ¥ ${valuation.toLocaleString()}
-              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600">¥ ${currentPrice.toLocaleString()}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-800">${holding.toLocaleString()} 株</td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-mono text-gray-600">¥ ${valuation.toLocaleString()}</td>
               <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium space-x-2">
                  <a href="${sellDisabled ? '#' : sellUrl}" target="_blank" class="inline-block px-3 py-1 rounded text-xs font-bold transition ${sellClass}" ${sellDisabled ? 'onclick="return false;"' : ''}>売</a>
                  <a href="${buyUrl}" target="_blank" class="inline-block px-3 py-1 rounded text-xs font-bold bg-green-50 text-green-600 hover:bg-green-100 transition">買</a>
@@ -432,38 +429,12 @@
           `;
         });
         
-        // 前回のHTMLと比較して変更がある場合のみ更新（チラつき防止）
-        if(tbody.innerHTML !== html) {
-          tbody.innerHTML = html;
-        }
-      }
-
-      // --- その他のUI更新 ---
-      function updateTicker() {
-        const ticker = document.getElementById('price-ticker');
-        ticker.innerHTML = '';
-        Object.entries(state.currentPrices).forEach(([name, price]) => {
-          const item = document.createElement('div');
-          item.className = "flex-shrink-0 bg-white border rounded px-3 py-1 text-xs shadow-sm cursor-pointer hover:bg-gray-50";
-          item.onclick = () => toggleStock(name);
-          
-          const isActive = state.activeStocks.has(name);
-          const color = getColor(name);
-          item.style.borderLeft = `3px solid ${isActive ? color : '#e5e7eb'}`;
-          item.style.opacity = isActive ? '1' : '0.6';
-
-          item.innerHTML = `
-            <span class="font-bold text-gray-700 block">${name}</span>
-            <span class="font-mono text-gray-900">¥${price.toLocaleString()}</span>
-          `;
-          ticker.appendChild(item);
-        });
+        if(tbody.innerHTML !== html) tbody.innerHTML = html;
       }
 
       function updateEvents(now) {
         const list = document.getElementById('event-list');
         const recents = state.eventsSchedule.filter(e => e.time_date <= now).reverse().slice(0, 5);
-        
         if (recents.length === 0) {
           list.innerHTML = '<li class="text-gray-400 text-xs">イベント履歴なし</li>';
         } else {
@@ -476,7 +447,6 @@
         }
       }
 
-      // --- ユーティリティ ---
       function getColor(name) {
         if (state.stockColors[name]) return state.stockColors[name];
         const index = Object.keys(state.stockColors).length;
@@ -488,7 +458,7 @@
         if(state.activeStocks.has(name)) state.activeStocks.delete(name);
         else state.activeStocks.add(name);
         updateChart();
-        updateTicker();
+        updateLegend();
       }
 
       function initTimeRangeSelector() {
@@ -505,7 +475,6 @@
           updateChart();
         };
       }
-
     })();
   </script>
 </body>
