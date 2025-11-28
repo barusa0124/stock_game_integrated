@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <title>お株ゲーム 統合ダッシュボード</title>
+  
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+    /* ローディングオーバーレイ */
+    #loading-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255,255,255,0.9); z-index: 50; display: none;
+      justify-content: center; align-items: center; flex-direction: column;
+    }
+    /* iframeのレスポンシブ対応 */
+    .iframe-container {
+      width: 100%;
+      height: 800px; /* 初期の高さ */
+      border: none;
+      border-radius: 0.75rem;
+      background-color: white;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    /* チャートの高さ */
+    .chart-container-height { height: 400px; }
+    @media (max-width: 768px) { .chart-container-height { height: 300px; } }
+  </style>
+</head>
+<body>
+
+  <div id="login-screen" class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
+      <div class="text-center">
+        <h2 class="text-3xl font-extrabold text-gray-900">お株ゲーム</h2>
+        <p class="mt-2 text-sm text-gray-600">プレイヤー情報を入力してログインしてください</p>
+      </div>
+      <form class="mt-8 space-y-6" id="login-form">
+        <div class="rounded-md shadow-sm -space-y-px">
+          <div>
+            <label for="player-name" class="sr-only">プレイヤー名</label>
+            <input id="player-name" name="player-name" type="text" required class="appearance-none rounded-none rounded-t-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" placeholder="プレイヤー名">
+          </div>
+          <div>
+            <label for="password" class="sr-only">パスワード</label>
+            <input id="password" name="password" type="password" required class="appearance-none rounded-none rounded-b-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" placeholder="パスワード">
+          </div>
+        </div>
+
+        <div>
+          <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            ログインして開始
+          </button>
+        </div>
+      </form>
+      <div class="text-center text-xs text-gray-400 mt-4">
+        <p>デモ用: プレイヤー名 "DEMO", パスワード "demo"</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="dashboard-screen" class="hidden min-h-screen pb-10">
+    
+    <header class="bg-white shadow mb-6">
+      <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-900">マーケット情報</h1>
+        <div class="flex items-center gap-4">
+            <span class="text-sm text-gray-500">最終更新: <span id="last-updated">--</span></span>
+            <button onclick="logout()" class="text-sm text-red-600 hover:text-red-800 font-medium">ログアウト</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        
+        <div class="bg-white overflow-hidden shadow rounded-lg p-4">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h2 class="text-lg font-medium text-gray-900">株価推移チャート (5秒更新)</h2>
+                <select id="time-range-selector" class="border border-gray-300 rounded text-sm p-1">
+                    </select>
+            </div>
+            <div class="flex flex-col md:flex-row gap-4 chart-container-height">
+                <div class="flex-1 relative w-full h-full min-w-0">
+                    <canvas id="combined-chart"></canvas>
+                </div>
+                <div class="w-full md:w-64 border-l pl-0 md:pl-4 overflow-y-auto h-full text-sm">
+                    <div id="legend-list" class="space-y-2"></div>
+                </div>
+            </div>
+            <div id="price-board" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 mt-4 pt-4 border-t"></div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <div class="bg-white shadow rounded-lg p-4 lg:col-span-1 h-fit">
+                <h2 class="text-lg font-medium text-gray-900 mb-4 border-b pb-2">直近のイベント</h2>
+                <ul id="event-list" class="space-y-3 text-sm">
+                    <li class="text-gray-500">読み込み中...</li>
+                </ul>
+            </div>
+
+            <div class="lg:col-span-2">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xl font-bold text-gray-800">マイページ</h2>
+                    <button onclick="reloadPlayerFrame()" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded transition">
+                        情報を更新
+                    </button>
+                </div>
+                <iframe id="player-frame" class="iframe-container" src="about:blank"></iframe>
+                <p class="text-xs text-gray-500 mt-1 text-right">※注文を行うと自動的に情報が更新されます。</p>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      // ==========================================
+      // ★設定: ここをあなたのGASウェブアプリURLに変更してください
+      // ==========================================
+      const GAS_WEB_APP_URL = "https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXX/exec"; 
+      
+      const JSON_FILE_URL = './stock_schedule.json'; 
+      const UPDATE_INTERVAL = 5000;
+      const LOCAL_STORAGE_KEY = 'active_stocks_v2'; 
+      const TIME_RANGE_OPTIONS = [
+          { label: '直近 5分', value: 5 }, { label: '直近 10分', value: 10 },
+          { label: '直近 30分', value: 30 }, { label: '直近 1時間', value: 60 }
+      ];
+
+      // グローバル変数
+      let pricesSchedule = [];
+      let eventsSchedule = [];
+      let ACTIVE_STOCKS = new Set();
+      let stockChart = null;
+      let dynamicStockColors = {};
+      let currentHistoryMinutes = 10;
+      const COLOR_PALETTE = ["#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#6366f1", "#84cc16", "#ec4899"];
+
+      // --- ログイン処理 ---
+      const loginForm = document.getElementById('login-form');
+      const loginScreen = document.getElementById('login-screen');
+      const dashboardScreen = document.getElementById('dashboard-screen');
+      const playerFrame = document.getElementById('player-frame');
+
+      // ページ読み込み時にセッション確認（簡易的）
+      const savedPlayer = sessionStorage.getItem('stock_game_player');
+      const savedPass = sessionStorage.getItem('stock_game_pass');
+      if(savedPlayer && savedPass) {
+          startDashboard(savedPlayer, savedPass);
+      }
+
+      loginForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const name = document.getElementById('player-name').value;
+          const pass = document.getElementById('password').value;
+          
+          if(name && pass) {
+              sessionStorage.setItem('stock_game_player', name);
+              sessionStorage.setItem('stock_game_pass', pass);
+              startDashboard(name, pass);
+          }
+      });
+
+      window.logout = function() {
+          sessionStorage.clear();
+          location.reload();
+      };
+
+      window.reloadPlayerFrame = function() {
+          playerFrame.src = playerFrame.src; // iframeのリロード
+      };
+
+      function startDashboard(name, pass) {
+          // 画面切り替え
+          loginScreen.classList.add('hidden');
+          dashboardScreen.classList.remove('hidden');
+
+          // GASのURLを生成してiframeにセット
+          // encodeURIComponentで日本語や記号を安全に処理
+          const targetUrl = `${GAS_WEB_APP_URL}?playerName=${encodeURIComponent(name)}&password=${encodeURIComponent(pass)}`;
+          playerFrame.src = targetUrl;
+
+          // チャート機能の初期化・開始
+          loadSchedule();
+      }
+
+      // --- 以下、チャート・データ取得ロジック (前回のコードを統合) ---
+
+      function getColorForStock(name) {
+          if (dynamicStockColors[name]) return dynamicStockColors[name];
+          const index = Object.keys(dynamicStockColors).length;
+          const color = COLOR_PALETTE[index % COLOR_PALETTE.length];
+          dynamicStockColors[name] = color;
+          return color;
+      }
+
+      function loadSchedule() {
+          const timestampedUrl = `${JSON_FILE_URL}?t=${new Date().getTime()}`;
+          fetch(timestampedUrl)
+            .then(res => res.json())
+            .then(data => {
+                if (!data || !data[0]) return;
+                pricesSchedule = data[0].prices_schedule;
+                eventsSchedule = data[0].events_schedule;
+
+                [pricesSchedule, eventsSchedule].forEach(arr => {
+                    arr.forEach(d => d.time_date = new Date(d.time_absolute_iso));
+                    arr.sort((a, b) => a.time_date - b.time_date);
+                });
+
+                // 初回のみ実行
+                if(ACTIVE_STOCKS.size === 0) {
+                     const allNames = pricesSchedule.length > 0 ? pricesSchedule[0].prices.map(p => p.name) : [];
+                     loadActiveStocks(allNames);
+                     initTimeRangeSelector();
+                     setInterval(checkAndUpdate, UPDATE_INTERVAL);
+                }
+                checkAndUpdate();
+            })
+            .catch(e => console.error("Data load error:", e));
+      }
+
+      // 定期更新: データのみ再取得
+      function checkAndUpdate() {
+          const timestampedUrl = `${JSON_FILE_URL}?t=${new Date().getTime()}`;
+          fetch(timestampedUrl)
+             .then(res => res.json())
+             .then(data => {
+                 if(!data || !data[0]) return;
+                 // データを更新
+                 const newPrices = data[0].prices_schedule;
+                 newPrices.forEach(d => d.time_date = new Date(d.time_absolute_iso));
+                 newPrices.sort((a, b) => a.time_date - b.time_date);
+                 pricesSchedule = newPrices;
+                 
+                 const newEvents = data[0].events_schedule;
+                 newEvents.forEach(d => d.time_date = new Date(d.time_absolute_iso));
+                 eventsSchedule = newEvents;
+
+                 renderDashboard();
+             });
+      }
+
+      function renderDashboard() {
+          const now = new Date();
+          let latestPriceData = null;
+          let previousPriceData = null;
+
+          // 最新のデータを検索
+          for (let i = 0; i < pricesSchedule.length; i++) {
+              if (pricesSchedule[i].time_date <= now) {
+                  previousPriceData = latestPriceData;
+                  latestPriceData = pricesSchedule[i].prices;
+              } else { break; }
+          }
+          
+          if (latestPriceData) {
+              updateChart();
+              updateLegend(latestPriceData, previousPriceData);
+              updatePriceBoard(latestPriceData, previousPriceData);
+              updateEvents(now);
+              document.getElementById('last-updated').textContent = now.toLocaleTimeString('ja-JP');
+          }
+      }
+
+      function updateChart() {
+          const ctx = document.getElementById('combined-chart').getContext('2d');
+          const now = Date.now();
+          const historyMs = currentHistoryMinutes * 60 * 1000;
+          
+          // データフィルタリング
+          const filtered = pricesSchedule.filter(e => e.time_date.getTime() >= (now - historyMs) && e.time_date.getTime() <= now);
+          
+          // データセット構築
+          const stockNames = pricesSchedule.length > 0 ? pricesSchedule[0].prices.map(p => p.name) : [];
+          const datasets = stockNames.map(name => {
+              const dataPoints = filtered.map(e => {
+                  const p = e.prices.find(item => item.name === name);
+                  return { x: e.time_date.getTime(), y: p ? p.price : null };
+              });
+              const color = getColorForStock(name);
+              return {
+                  label: name, data: dataPoints, borderColor: color, backgroundColor: color,
+                  borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.1,
+                  hidden: !ACTIVE_STOCKS.has(name)
+              };
+          });
+
+          // Y軸のスケール計算 (簡易版)
+          let allPrices = filtered.flatMap(e => e.prices.filter(p => ACTIVE_STOCKS.has(p.name)).map(p => p.price));
+          if(allPrices.length === 0) allPrices = [1000];
+          const minP = Math.min(...allPrices);
+          const maxP = Math.max(...allPrices);
+          const margin = (maxP - minP) * 0.1 || 100;
+          
+          if(stockChart) {
+              stockChart.data.datasets = datasets;
+              stockChart.options.scales.x.min = now - historyMs;
+              stockChart.options.scales.x.max = now;
+              stockChart.options.scales.y.min = Math.floor(minP - margin);
+              stockChart.options.scales.y.max = Math.ceil(maxP + margin);
+              stockChart.update('none');
+          } else {
+              stockChart = new Chart(ctx, {
+                  type: 'line',
+                  data: { datasets },
+                  options: {
+                      responsive: true, maintainAspectRatio: false, animation: false,
+                      plugins: { legend: { display: false } },
+                      scales: {
+                          x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'H:mm' } }, min: now - historyMs, max: now },
+                          y: { min: Math.floor(minP - margin), max: Math.ceil(maxP + margin) }
+                      }
+                  }
+              });
+          }
+      }
+
+      function updateLegend(current, prev) {
+          const container = document.getElementById('legend-list');
+          container.innerHTML = '';
+          current.forEach(item => {
+             const color = getColorForStock(item.name);
+             const div = document.createElement('div');
+             const isActive = ACTIVE_STOCKS.has(item.name);
+             div.className = `flex justify-between items-center p-2 rounded cursor-pointer ${isActive ? 'bg-gray-100' : 'bg-white opacity-50'}`;
+             div.onclick = () => {
+                 if(ACTIVE_STOCKS.has(item.name)) ACTIVE_STOCKS.delete(item.name);
+                 else ACTIVE_STOCKS.add(item.name);
+                 saveActiveStocks(ACTIVE_STOCKS);
+                 renderDashboard();
+             };
+             
+             // 変動計算
+             const prevVal = prev ? (prev.find(p=>p.name===item.name)?.price || item.price) : item.price;
+             const diff = item.price - prevVal;
+             const sign = diff >= 0 ? '+' : '';
+             const textColor = diff > 0 ? 'text-green-600' : (diff < 0 ? 'text-red-600' : 'text-gray-500');
+
+             div.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full" style="background:${color}"></span>
+                    <span class="font-bold text-gray-700">${item.name}</span>
+                </div>
+                <div class="text-right">
+                    <div class="font-bold">¥${item.price.toLocaleString()}</div>
+                    <div class="text-xs ${textColor}">${sign}${diff}</div>
+                </div>
+             `;
+             container.appendChild(div);
+          });
+      }
+      
+      function updatePriceBoard(current, prev) {
+          const board = document.getElementById('price-board');
+          board.innerHTML = '';
+          current.forEach(item => {
+              const prevVal = prev ? (prev.find(p=>p.name===item.name)?.price || item.price) : item.price;
+              const diff = item.price - prevVal;
+              const colorClass = diff >= 0 ? 'text-green-600' : 'text-red-600';
+              const bgClass = diff >= 0 ? 'bg-green-50' : 'bg-red-50';
+              
+              const div = document.createElement('div');
+              div.className = `p-2 rounded border ${bgClass} text-center`;
+              div.innerHTML = `
+                 <div class="text-xs text-gray-500 font-bold truncate">${item.name}</div>
+                 <div class="text-lg font-bold text-gray-800">¥${item.price.toLocaleString()}</div>
+                 <div class="text-xs ${colorClass}">${diff >=0 ? '▲':'▼'} ${Math.abs(diff)}</div>
+              `;
+              board.appendChild(div);
+          });
+      }
+
+      function updateEvents(now) {
+          const list = document.getElementById('event-list');
+          const recents = eventsSchedule.filter(e => e.time_date <= now).reverse().slice(0, 5);
+          
+          if(recents.length === 0) {
+              list.innerHTML = '<li class="text-gray-400">イベントなし</li>';
+              return;
+          }
+          list.innerHTML = '';
+          recents.forEach(e => {
+              const li = document.createElement('li');
+              li.className = "border-l-4 border-indigo-500 pl-2 py-1";
+              li.innerHTML = `
+                  <div class="font-bold text-gray-800">${e.event_title}</div>
+                  <div class="text-xs text-gray-500">${e.time_date.toLocaleTimeString('ja-JP')}</div>
+              `;
+              list.appendChild(li);
+          });
+      }
+
+      // --- ユーティリティ ---
+      function initTimeRangeSelector() {
+          const sel = document.getElementById('time-range-selector');
+          sel.innerHTML = '';
+          TIME_RANGE_OPTIONS.forEach(o => {
+              const opt = document.createElement('option');
+              opt.value = o.value; opt.textContent = o.label;
+              if(o.value === currentHistoryMinutes) opt.selected = true;
+              sel.appendChild(opt);
+          });
+          sel.onchange = (e) => {
+              currentHistoryMinutes = parseInt(e.target.value);
+              renderDashboard();
+          };
+      }
+      
+      function loadActiveStocks(allNames) {
+          const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+          if(stored) { try { ACTIVE_STOCKS = new Set(JSON.parse(stored)); return; } catch(e){} }
+          allNames.forEach(n => ACTIVE_STOCKS.add(n));
+      }
+      function saveActiveStocks(set) {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(Array.from(set)));
+      }
+
+    })();
+  </script>
+</body>
+</html>
