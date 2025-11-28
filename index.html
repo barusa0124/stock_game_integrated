@@ -52,9 +52,19 @@
     .text-red { color: rgb(220, 38, 38); }
     .text-gray { color: #6b7280; }
 
-    /* アコーディオン用 */
-    .accordion-content { transition: max-height 0.3s ease-out; overflow: hidden; max-height: 2000px; }
-    .accordion-content.collapsed { max-height: 0; }
+    /* アコーディオン用 (完全隠蔽対応) */
+    .accordion-content { 
+        transition: max-height 0.3s ease-out, padding 0.3s ease, opacity 0.3s ease; 
+        overflow: hidden; 
+        max-height: 2000px; 
+        opacity: 1;
+    }
+    .accordion-content.collapsed { 
+        max-height: 0 !important; 
+        padding-top: 0 !important; 
+        padding-bottom: 0 !important; 
+        opacity: 0;
+    }
     .accordion-icon { transition: transform 0.3s; }
     .accordion-icon.rotate { transform: rotate(180deg); }
   </style>
@@ -112,7 +122,9 @@
                   <svg class="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                   <span class="hidden sm:inline">更新</span>
               </button>
-              <div class="text-[10px] text-gray-400 mt-0.5">Updated: <span id="data-last-updated">--:--</span></div>
+              <div class="text-[10px] text-gray-400 mt-0.5 whitespace-nowrap">
+                  Last: <span id="data-last-updated">--:--</span>
+              </div>
           </div>
 
           <button onclick="logout()" class="text-xs sm:text-sm text-gray-500 hover:text-red-600 transition p-1">ログアウト</button>
@@ -125,8 +137,11 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="card p-4 sm:p-6 flex items-center justify-between bg-gradient-to-r from-blue-50 to-white">
           <div>
-            <p class="text-xs sm:text-sm text-gray-500 font-medium">総資産評価額 (リアルタイム)</p>
-            <p id="total-assets" class="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">¥ ---</p>
+            <div class="flex items-center gap-2 mb-1">
+                <p class="text-xs sm:text-sm text-gray-500 font-medium">総資産評価額 (リアルタイム)</p>
+                <div class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-mono" id="market-clock">--:--:--</div>
+            </div>
+            <p id="total-assets" class="text-2xl sm:text-3xl font-bold text-gray-900">¥ ---</p>
           </div>
           <div class="p-2 sm:p-3 bg-blue-100 rounded-full text-blue-600">
             <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -157,18 +172,18 @@
               </div>
               
               <div class="w-full lg:w-64 lg:border-l lg:pl-4 border-gray-200">
-                  <div class="flex justify-between items-center mb-2 cursor-pointer lg:cursor-default bg-gray-50 lg:bg-transparent p-2 lg:p-0 rounded" onclick="toggleAccordion('legend-content', 'legend-icon')">
+                  <div class="flex justify-between items-center mb-2 cursor-pointer lg:cursor-default bg-gray-50 lg:bg-transparent p-3 lg:p-0 rounded" onclick="toggleAccordion('legend-content', 'legend-icon')">
                       <h3 class="text-xs font-bold text-gray-600 uppercase">銘柄一覧</h3>
-                      <div class="flex items-center gap-2">
-                          <label class="flex items-center gap-1 cursor-pointer select-none">
-                              <input type="checkbox" id="toggle-all-stocks" class="form-checkbox h-3 w-3 text-indigo-600 rounded" checked>
-                              <span class="text-[10px] text-indigo-600 font-bold">全選択/解除</span>
+                      <div class="flex items-center gap-3">
+                          <label class="flex items-center gap-2 cursor-pointer select-none">
+                              <input type="checkbox" id="toggle-all-stocks" class="form-checkbox h-5 w-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" checked>
+                              <span class="text-xs text-indigo-600 font-bold">全選択</span>
                           </label>
-                          <svg id="legend-icon" class="w-4 h-4 text-gray-500 lg:hidden accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                          <svg id="legend-icon" class="w-5 h-5 text-gray-500 lg:hidden accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                       </div>
                   </div>
                   
-                  <div id="legend-content" class="accordion-content lg:max-h-full overflow-y-auto lg:h-[calc(100%-2rem)]">
+                  <div id="legend-content" class="accordion-content lg:max-h-full overflow-y-auto lg:h-[calc(100%-2rem)] lg:!p-0 lg:!max-h-none lg:!opacity-100">
                       <div id="chart-legend" class="grid grid-cols-1 gap-1">
                           </div>
                   </div>
@@ -180,9 +195,9 @@
           <div class="card p-0 lg:p-4 overflow-hidden">
             <div class="p-4 lg:p-0 flex justify-between items-center cursor-pointer lg:cursor-default" onclick="toggleAccordion('event-content', 'event-icon')">
                 <h3 class="text-sm font-bold text-gray-500 uppercase">News / Events</h3>
-                <svg id="event-icon" class="w-4 h-4 text-gray-500 lg:hidden accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                <svg id="event-icon" class="w-5 h-5 text-gray-500 lg:hidden accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
             </div>
-            <div id="event-content" class="accordion-content lg:max-h-full px-4 pb-4 lg:px-0 lg:pb-0">
+            <div id="event-content" class="accordion-content px-4 pb-4 lg:!p-0 lg:!max-h-none lg:!opacity-100">
                 <ul id="event-list" class="space-y-3 text-sm mt-2 lg:mt-3">
                   <li class="text-gray-400 text-xs">情報を取得中...</li>
                 </ul>
@@ -195,9 +210,9 @@
                   <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
                   Messages
                 </h3>
-                <svg id="message-icon" class="w-4 h-4 text-yellow-700 lg:hidden accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                <svg id="message-icon" class="w-5 h-5 text-yellow-700 lg:hidden accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
             </div>
-            <div id="message-content" class="accordion-content lg:max-h-full px-4 pb-4 lg:px-0 lg:pb-0">
+            <div id="message-content" class="accordion-content px-4 pb-4 lg:!p-0 lg:!max-h-none lg:!opacity-100">
                 <ul id="message-list" class="space-y-2 text-sm text-gray-700 max-h-48 overflow-y-auto mt-2 lg:mt-3">
                   <li class="text-gray-400 text-xs">メッセージなし</li>
                 </ul>
@@ -256,7 +271,19 @@
         quantity: "entry.921771076", playerName: "entry.793982397", password: "entry.625519360"
       };
 
-      const COLOR_PALETTE = ["#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#6366f1", "#84cc16", "#ec4899"];
+      // 10色に拡張
+      const COLOR_PALETTE = [
+          "#3b82f6", // Blue
+          "#10b981", // Green
+          "#ef4444", // Red
+          "#f59e0b", // Yellow
+          "#6366f1", // Indigo
+          "#84cc16", // Lime
+          "#ec4899", // Pink
+          "#06b6d4", // Cyan (NEW)
+          "#f97316", // Orange (NEW)
+          "#8b5cf6"  // Purple (NEW)
+      ];
       // =========================================================================
 
       const STOCK_DATA_URL = `${GAS_API_URL}?type=stock`; 
@@ -265,14 +292,12 @@
         pricesSchedule: [], eventsSchedule: [], activeStocks: new Set(),
         playerInfo: null, currentPrices: {}, previousPricesForAnimation: {}, 
         chart: null, historyMinutes: 10, stockColors: {}, lastFetchTime: 0,
-        isInitialized: false // 初回初期化フラグ
+        isInitialized: false
       };
 
       // --- アコーディオン制御 (モバイル用) ---
       window.toggleAccordion = function(contentId, iconId) {
-          // PCサイズ(1024px以上)では無効化
           if (window.innerWidth >= 1024) return;
-          
           const content = document.getElementById(contentId);
           const icon = document.getElementById(iconId);
           content.classList.toggle('collapsed');
@@ -297,13 +322,13 @@
           
           btn.disabled = true;
           btn.classList.add('opacity-75', 'cursor-not-allowed');
+          // ローディングアイコン表示
           btn.innerHTML = `<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
 
           fetchPlayerData().then(() => {
               btn.innerHTML = originalContent;
               btn.disabled = false;
               btn.classList.remove('opacity-75', 'cursor-not-allowed');
-              // 更新時刻反映
               const now = new Date();
               document.getElementById('data-last-updated').textContent = now.toLocaleTimeString('ja-JP');
           });
@@ -378,9 +403,12 @@
 
       // --- UI描画 (Clock Tick) ---
       function renderUI() {
+        const now = new Date();
+        // ★リアルタイム時刻更新
+        document.getElementById('market-clock').textContent = now.toLocaleTimeString('ja-JP');
+
         if (state.pricesSchedule.length === 0) return;
         
-        const now = new Date();
         const schedule = [...state.pricesSchedule];
         const latestEntry = schedule.slice().reverse().find(e => e.time_date <= now);
 
@@ -389,7 +417,6 @@
           latestEntry.prices.forEach(p => { state.currentPrices[p.name] = p.price; });
           state.previousPricesForAnimation = {...state.currentPrices};
 
-          // 初回のみアクティブ銘柄をセット (バグ修正: フラグ管理)
           if (!state.isInitialized) {
             latestEntry.prices.forEach(p => state.activeStocks.add(p.name));
             state.isInitialized = true;
@@ -398,8 +425,8 @@
           updateChart();
           updateLegend(oldPrices); 
           updateEvents(now);
-          updateRealtimeAssets(); // リアルタイム資産計算
-          updatePortfolioUI();    // テーブル内の現在値更新
+          updateRealtimeAssets(); 
+          updatePortfolioUI();    
         }
       }
 
@@ -425,17 +452,14 @@
       function calculateNiceScale(min, max) {
         if (min === max) { min -= 100; max += 100; }
         
-        // 少し余白を持たせる
         let rawRange = max - min;
         let tentativeMin = Math.max(0, min - (rawRange * 0.1));
         let tentativeMax = max + (rawRange * 0.1);
         let range = tentativeMax - tentativeMin;
 
-        // ステップ数を概ね 5~8 程度にする
         const targetSteps = 5;
         const roughStep = range / targetSteps;
 
-        // キリの良いステップ幅を計算 (例: 10, 20, 50, 100...)
         const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
         const normalizedStep = roughStep / magnitude;
         
@@ -483,7 +507,7 @@
             plugins: { legend: { display: false } },
             scales: {
               x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'H:mm' } } },
-              y: { position: 'right', min: min, max: max, ticks: { stepSize: stepSize } } // stepSize指定
+              y: { position: 'right', min: min, max: max, ticks: { stepSize: stepSize } } 
             }
         };
 
@@ -537,7 +561,6 @@
           item.onclick = () => {
               if(state.activeStocks.has(name)) state.activeStocks.delete(name);
               else state.activeStocks.add(name);
-              // 全選択チェックボックスの状態更新
               const allCount = Object.keys(state.currentPrices).length;
               toggleAllCheckbox.checked = state.activeStocks.size === allCount;
               renderUI();
