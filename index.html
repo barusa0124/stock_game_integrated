@@ -19,6 +19,10 @@
     @keyframes flash-red { 0% { background-color: #fee2e2; } 100% { background-color: transparent; } }
     .flash-up { animation: flash-green 1s ease-out; }
     .flash-down { animation: flash-red 1s ease-out; }
+    
+    /* スクロールバー隠し */
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
 <body class="text-gray-800">
@@ -153,9 +157,9 @@
   <script>
     (function() {
       // ==========================================
-      // ★設定: ここをあなたのGASウェブアプリURLに変更
+      // ★設定: ここをあなたのGASウェブアプリURLに変更してください
       // ==========================================
-      const GAS_API_URL = "https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXX/exec"; 
+      const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwGrdHT3-83v4_UHejIaXgELoGe9xHObNTsYwOZKTTOiApvVvIGA6WC_YM7Ba1dx2pr2Q/exec"; 
       
       // Googleフォーム設定
       const FORM_BASE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdoja9xkNFAAcl8zVG1887ecImnNNrmNlSVzG7c_10yZWOG-A/formResponse";
@@ -168,7 +172,9 @@
         password: "entry.625519360"
       };
 
-      const JSON_FILE_URL = './stock_schedule.json'; 
+      // 修正: 株価データもGASから取得するため、GASのAPI URLにパラメータを付与して使用
+      const STOCK_DATA_URL = `${GAS_API_URL}?type=stock`; 
+      
       const UPDATE_INTERVAL = 5000;
       const TIME_RANGE_OPTIONS = [
           { label: '5分', value: 5 }, { label: '10分', value: 10 },
@@ -235,8 +241,15 @@
         const password = sessionStorage.getItem('stock_game_pass');
 
         try {
-          // 1. 株価データ取得 (JSONファイル)
-          const stockRes = await fetch(`${JSON_FILE_URL}?t=${Date.now()}`);
+          // 1. 株価データ取得 (GAS APIから直接取得)
+          // redirect: 'follow' がGASウェブアプリへのアクセスには必須
+          const stockRes = await fetch(`${STOCK_DATA_URL}&t=${Date.now()}`, {
+             method: 'GET',
+             redirect: 'follow'
+          });
+          
+          if (!stockRes.ok) throw new Error("Stock data fetch failed");
+          
           const stockJson = await stockRes.json();
           
           if(stockJson && stockJson[0]) {
@@ -244,19 +257,20 @@
           }
 
           // 2. プレイヤーデータ取得 (GAS API)
-          // URLパラメータを生成
-          const params = new URLSearchParams({ playerName, password });
-          const playerRes = await fetch(`${GAS_API_URL}?${params.toString()}`, {
-             method: 'GET',
-             redirect: 'follow' // GASのリダイレクトを追跡
-          });
-          const playerJson = await playerRes.json();
+          if (playerName && password) {
+             const params = new URLSearchParams({ playerName, password });
+             const playerRes = await fetch(`${GAS_API_URL}?${params.toString()}`, {
+                method: 'GET',
+                redirect: 'follow'
+             });
+             const playerJson = await playerRes.json();
 
-          if(playerJson.success) {
-            state.playerInfo = playerJson.data;
-            updatePortfolioUI(); // プレイヤー情報描画
-          } else {
-            console.warn("Auth failed or API error:", playerJson.message);
+             if(playerJson.success) {
+               state.playerInfo = playerJson.data;
+               updatePortfolioUI(); 
+             } else {
+               console.warn("Auth failed or API error:", playerJson.message);
+             }
           }
           
           // UI更新時刻
