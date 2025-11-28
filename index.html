@@ -172,12 +172,21 @@
       </div>
 
       <div class="card overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-3">
           <h2 class="text-lg font-bold text-gray-800">ポートフォリオ管理</h2>
-          <a id="bulk-order-btn" href="#" target="_blank" class="text-sm font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-            フォームを開く <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-          </a>
+          
+          <div class="flex gap-3">
+              <button onclick="manualRefreshPlayer()" id="refresh-btn" class="text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg flex items-center gap-2 transition shadow">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  <span>情報を更新</span>
+              </button>
+
+              <a id="bulk-order-btn" href="#" target="_blank" class="text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-4 py-2 rounded-lg flex items-center gap-2 transition border border-indigo-100">
+                フォームを開く <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+              </a>
+          </div>
         </div>
+        
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -202,62 +211,49 @@
     (function() {
       // =========================================================================
       // ★★★ ユーザー設定エリア (User Settings) ★★★
-      // ここにある変数を変更することで、動作の設定を行えます。
       // =========================================================================
 
       // 1. GASウェブアプリのURL
-      // デプロイしたGASの「ウェブアプリのURL」をここに設定してください。
       const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwGrdHT3-83v4_UHejIaXgELoGe9xHObNTsYwOZKTTOiApvVvIGA6WC_YM7Ba1dx2pr2Q/exec";
 
-      // 2. 更新間隔 (ミリ秒)
-      // 画面の自動更新間隔です。デフォルト: 10000 = 10秒
-      const UPDATE_INTERVAL = 10000;
+      // 2. 画面リフレッシュ間隔 (ミリ秒) - 1秒ごとに時計を進める
+      const UI_REFRESH_INTERVAL = 1000;
 
-      // 3. チャートの時間範囲プルダウンの選択肢
-      // valueは「分」単位です。
+      // 3. チャートの時間範囲プルダウン
       const TIME_RANGE_OPTIONS = [
           { label: '5分', value: 5 }, 
           { label: '10分', value: 10 },
           { label: '30分', value: 30 }, 
-          { label: '1時間', value: 60 }, 
-          { label: '6時間', value: 360 }
+          { label: '60分', value: 60 },
+          { label: '全期間', value: 720 }
       ];
 
       // 4. アカウント登録フォームのURL
-      // ログイン画面の「アカウントをお持ちでない方はこちら」のリンク先です。
       const ACCOUNT_REGISTER_URL = "https://docs.google.com/forms/d/e/1FAIpQLSemSzfTWxwddd_nB1sq-dQFyR1_AHUIM-nGj-WIq1JZzvFNrA/viewform?usp=header";
 
-      // 5. 注文フォーム関連設定 (GoogleフォームのID等)
-      // フォームの送信先URLと、各質問項目のentry IDを設定します。
+      // 5. 注文フォーム関連設定
       const FORM_BASE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdoja9xkNFAAcl8zVG1887ecImnNNrmNlSVzG7c_10yZWOG-A/formResponse";
       const VIEW_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdoja9xkNFAAcl8zVG1887ecImnNNrmNlSVzG7c_10yZWOG-A/viewform";
       
       const FIELD_IDS = {
-        entryType: "entry.106548036", // 注文タイプ (売/買)
-        stockName: "entry.351651094", // 銘柄名
-        quantity: "entry.921771076",  // 注文株数
-        playerName: "entry.793982397", // プレイヤー名
-        password: "entry.625519360"    // パスワード
+        entryType: "entry.106548036", 
+        stockName: "entry.351651094", 
+        quantity: "entry.921771076",  
+        playerName: "entry.793982397",
+        password: "entry.625519360"   
       };
 
-      // 6. グラフの色パレット (銘柄ごとの色)
+      // 6. グラフの色パレット
       const COLOR_PALETTE = [
-          "#3b82f6", // 青
-          "#10b981", // 緑
-          "#ef4444", // 赤
-          "#f59e0b", // 黄
-          "#6366f1", // インディゴ
-          "#84cc16", // ライム
-          "#ec4899"  // ピンク
+          "#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#6366f1", "#84cc16", "#ec4899"
       ];
 
       // =========================================================================
-      // ★★★ 設定エリア終了 (End of User Settings) ★★★
+      // ★★★ 設定エリア終了 ★★★
       // =========================================================================
 
       const STOCK_DATA_URL = `${GAS_API_URL}?type=stock`; 
       
-      // グローバル状態
       let state = {
         pricesSchedule: [],
         eventsSchedule: [],
@@ -274,8 +270,6 @@
       // 初期化 & ログイン処理
       const loginForm = document.getElementById('login-form');
       const registerLink = document.getElementById('register-link');
-      
-      // 登録リンクのURLを設定
       if(registerLink) registerLink.href = ACCOUNT_REGISTER_URL;
 
       const savedPlayer = sessionStorage.getItem('stock_game_player');
@@ -301,98 +295,152 @@
         location.reload();
       };
 
+      // ★手動更新ボタン用関数
+      window.manualRefreshPlayer = function() {
+          const btn = document.getElementById('refresh-btn');
+          const originalText = btn.innerHTML;
+          
+          // ボタンをローディング状態にする
+          btn.disabled = true;
+          btn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 更新中...`;
+          btn.classList.add('opacity-75');
+
+          // プレイヤー情報を取得
+          fetchPlayerData().then(() => {
+              // 完了したら元に戻す
+              btn.innerHTML = originalText;
+              btn.disabled = false;
+              btn.classList.remove('opacity-75');
+              
+              // 成功エフェクト
+              btn.classList.add('bg-green-600');
+              setTimeout(() => btn.classList.remove('bg-green-600'), 1000);
+          });
+      };
+
       function startDashboard(name, pass) {
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('dashboard-screen').classList.remove('hidden');
         document.getElementById('display-player-name').textContent = name;
         
-        updateAllData();
-        setInterval(updateAllData, UPDATE_INTERVAL);
+        // 1. 株価スケジュール取得（1回のみ）
+        fetchStockSchedule();
+
+        // 2. プレイヤー情報取得（1回のみ、あとは手動）
+        fetchPlayerData();
+
+        // 3. UIの定期更新（通信なし、時計を進めるだけ）
+        setInterval(renderUI, UI_REFRESH_INTERVAL);
+        
         initTimeRangeSelector();
       }
 
-      // データ取得
-      async function updateAllData() {
-        const playerName = sessionStorage.getItem('stock_game_player');
-        const password = sessionStorage.getItem('stock_game_pass');
+      // --- データ取得ロジック ---
 
+      // A. 株価スケジュールの一括取得
+      async function fetchStockSchedule() {
         try {
-          const stockRes = await fetch(`${STOCK_DATA_URL}&t=${Date.now()}`, { method: 'GET', redirect: 'follow' });
-          if (!stockRes.ok) throw new Error("Stock data fetch failed");
-          const stockJson = await stockRes.json();
-          if(stockJson && stockJson[0]) {
-            processStockData(stockJson[0]);
+          const res = await fetch(`${STOCK_DATA_URL}&t=${Date.now()}`, { method: 'GET', redirect: 'follow' });
+          if (!res.ok) throw new Error("Stock fetch failed");
+          const json = await res.json();
+          
+          if(json && json[0]) {
+            // データをパースしてStateに保存
+            state.pricesSchedule = json[0].prices_schedule.map(d => ({...d, time_date: new Date(d.time_absolute_iso)}));
+            state.pricesSchedule.sort((a,b) => a.time_date - b.time_date);
+            
+            state.eventsSchedule = json[0].events_schedule.map(d => ({...d, time_date: new Date(d.time_absolute_iso)}));
+            
+            // 即時描画
+            renderUI();
           }
-
-          if (playerName && password) {
-             const params = new URLSearchParams({ playerName, password });
-             const playerRes = await fetch(`${GAS_API_URL}?${params.toString()}`, { method: 'GET', redirect: 'follow' });
-             const playerJson = await playerRes.json();
-             if(playerJson.success) {
-               state.playerInfo = playerJson.data;
-               updatePortfolioUI(); 
-             }
-          }
-          document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ja-JP');
         } catch (e) {
-          console.error("Update error:", e);
+          console.error("Stock data error:", e);
         }
       }
 
-      // データ処理
-      function processStockData(data) {
-        state.pricesSchedule = data.prices_schedule.map(d => ({...d, time_date: new Date(d.time_absolute_iso)}));
-        state.pricesSchedule.sort((a,b) => a.time_date - b.time_date);
-        state.eventsSchedule = data.events_schedule.map(d => ({...d, time_date: new Date(d.time_absolute_iso)}));
-        
+      // B. プレイヤー情報の取得
+      async function fetchPlayerData() {
+        const playerName = sessionStorage.getItem('stock_game_player');
+        const password = sessionStorage.getItem('stock_game_pass');
+        if (!playerName || !password) return;
+
+        try {
+           const params = new URLSearchParams({ playerName, password });
+           const res = await fetch(`${GAS_API_URL}?${params.toString()}`, { method: 'GET', redirect: 'follow' });
+           const json = await res.json();
+
+           if(json.success) {
+             state.playerInfo = json.data;
+             updatePortfolioUI(); // 取得したら即反映
+           } else {
+             alert("情報の更新に失敗しました: " + json.message);
+           }
+        } catch(e) {
+           console.error("Player data error:", e);
+           alert("通信エラーが発生しました");
+        }
+      }
+
+      // --- UI描画ループ (renderUI) ---
+      function renderUI() {
+        // 現在時刻を表示
         const now = new Date();
+        document.getElementById('last-updated').textContent = now.toLocaleTimeString('ja-JP');
+
+        // データがまだなければ終了
+        if (state.pricesSchedule.length === 0) return;
+
+        // 現在時刻に基づき、表示すべきデータを特定
         const schedule = [...state.pricesSchedule];
+        // 過去のデータの中で最も新しいものを探す
         const latestEntry = schedule.slice().reverse().find(e => e.time_date <= now);
-        
+
         if(latestEntry) {
+          // アニメーション用に前回の価格を保持
           const oldPrices = {...state.previousPricesForAnimation};
           
+          // 現在価格を更新
           latestEntry.prices.forEach(p => {
             state.currentPrices[p.name] = p.price;
           });
-          
           state.previousPricesForAnimation = {...state.currentPrices};
 
+          // 初回のアクティブ銘柄設定
           if(state.activeStocks.size === 0) {
             latestEntry.prices.forEach(p => state.activeStocks.add(p.name));
           }
 
+          // 各コンポーネントを更新
           updateChart();
           updateLegend(oldPrices); 
           updateEvents(now);
+          // ポートフォリオの評価額も現在価格に合わせて再計算
+          updatePortfolioUI();
         }
       }
 
-      // Y軸の目盛り計算
+      // --- 補助関数群 (グラフ・凡例・ポートフォリオ) ---
+
       function calculateNiceScale(min, max) {
         if (min === max) { min -= 100; max += 100; }
-        
         let range = max - min;
         let tentativeMin = min - (range * 0.1);
         let tentativeMax = max + (range * 0.1);
-        
         if (tentativeMin < 0) tentativeMin = 0;
-
         const magnitude = Math.pow(10, Math.floor(Math.log10(max - min || 1)));
         const interval = magnitude;
-
         const niceMin = Math.floor(tentativeMin / interval) * interval;
         const niceMax = Math.ceil(tentativeMax / interval) * interval;
-
         return { min: niceMin, max: niceMax };
       }
 
-      // チャート更新
       function updateChart() {
         const ctx = document.getElementById('combined-chart').getContext('2d');
         const now = Date.now();
         const rangeMs = state.historyMinutes * 60 * 1000;
         
+        // フィルタリング
         const filtered = state.pricesSchedule.filter(d => d.time_date.getTime() >= (now - rangeMs) && d.time_date.getTime() <= now);
         
         const stockNames = Object.keys(state.currentPrices);
@@ -402,7 +450,6 @@
             const p = d.prices.find(item => item.name === name);
             return { x: d.time_date.getTime(), y: p ? p.price : null };
           });
-          
           return {
             label: name, data, borderColor: color, backgroundColor: color,
             borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.1,
@@ -412,7 +459,6 @@
 
         let allValues = filtered.flatMap(d => d.prices.filter(p => state.activeStocks.has(p.name)).map(p => p.price));
         if(allValues.length === 0) allValues = [1000];
-        
         const rawMin = Math.min(...allValues);
         const rawMax = Math.max(...allValues);
         const { min, max } = calculateNiceScale(rawMin, rawMax);
@@ -440,7 +486,6 @@
         }
       }
 
-      // 凡例更新
       function updateLegend(oldPrices) {
         const container = document.getElementById('chart-legend');
         container.innerHTML = '';
@@ -575,8 +620,8 @@
       function toggleStock(name) {
         if(state.activeStocks.has(name)) state.activeStocks.delete(name);
         else state.activeStocks.add(name);
-        updateChart();
-        updateLegend(state.previousPricesForAnimation);
+        // UI全体を再描画（チャートと凡例のハイライト状態を更新）
+        renderUI();
       }
 
       function initTimeRangeSelector() {
@@ -590,7 +635,7 @@
         });
         sel.onchange = (e) => {
           state.historyMinutes = parseInt(e.target.value);
-          updateChart();
+          renderUI();
         };
       }
     })();
