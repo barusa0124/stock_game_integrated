@@ -51,6 +51,12 @@
     .text-green { color: rgb(22, 163, 74); }
     .text-red { color: rgb(220, 38, 38); }
     .text-gray { color: #6b7280; }
+
+    /* アコーディオン用 */
+    .accordion-content { transition: max-height 0.3s ease-out; overflow: hidden; max-height: 2000px; }
+    .accordion-content.collapsed { max-height: 0; }
+    .accordion-icon { transition: transform 0.3s; }
+    .accordion-icon.rotate { transform: rotate(180deg); }
   </style>
 </head>
 <body class="text-gray-800">
@@ -92,110 +98,131 @@
   <div id="dashboard-screen" class="hidden min-h-screen pb-12">
     
     <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
-        <div class="flex items-center gap-4">
-          <h1 class="text-xl font-bold text-indigo-600">Market Trader</h1>
-          <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-medium">
-            Player: <span id="display-player-name">--</span>
+      <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
+        <div class="flex items-center gap-2 sm:gap-4 overflow-hidden">
+          <h1 class="text-lg sm:text-xl font-bold text-indigo-600 whitespace-nowrap">Trader</h1>
+          <span class="bg-gray-100 text-gray-600 px-2 sm:px-3 py-1 rounded-full text-xs font-medium truncate max-w-[100px] sm:max-w-none">
+            <span id="display-player-name">--</span>
           </span>
         </div>
-        <div class="flex items-center gap-4">
-          <div class="text-right hidden sm:block">
-            <div class="text-[10px] text-gray-400">MARKET TIME</div>
-            <div id="last-updated" class="text-sm font-mono font-medium">--:--:--</div>
+        
+        <div class="flex items-center gap-2 sm:gap-4">
+          <div class="flex flex-col items-end">
+              <button onclick="manualRefreshPlayer()" id="refresh-btn" class="text-xs sm:text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded shadow flex items-center gap-1 transition">
+                  <svg class="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  <span class="hidden sm:inline">更新</span>
+              </button>
+              <div class="text-[10px] text-gray-400 mt-0.5">Updated: <span id="data-last-updated">--:--</span></div>
           </div>
-          <button onclick="logout()" class="text-sm text-gray-500 hover:text-red-600 transition">ログアウト</button>
+
+          <button onclick="logout()" class="text-xs sm:text-sm text-gray-500 hover:text-red-600 transition p-1">ログアウト</button>
         </div>
       </div>
     </header>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+    <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 mt-4 space-y-6">
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="card p-6 flex items-center justify-between bg-gradient-to-r from-blue-50 to-white">
+        <div class="card p-4 sm:p-6 flex items-center justify-between bg-gradient-to-r from-blue-50 to-white">
           <div>
-            <p class="text-sm text-gray-500 font-medium">総資産評価額 (Total Assets)</p>
-            <p id="total-assets" class="text-3xl font-bold text-gray-900 mt-1">¥ ---</p>
+            <p class="text-xs sm:text-sm text-gray-500 font-medium">総資産評価額 (リアルタイム)</p>
+            <p id="total-assets" class="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">¥ ---</p>
           </div>
-          <div class="p-3 bg-blue-100 rounded-full text-blue-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <div class="p-2 sm:p-3 bg-blue-100 rounded-full text-blue-600">
+            <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
           </div>
         </div>
-        <div class="card p-6 flex items-center justify-between">
+        <div class="card p-4 sm:p-6 flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-500 font-medium">現金余力 (Cash)</p>
-            <p id="cash-assets" class="text-3xl font-bold text-gray-900 mt-1">¥ ---</p>
+            <p class="text-xs sm:text-sm text-gray-500 font-medium">現金余力 (Cash)</p>
+            <p id="cash-assets" class="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">¥ ---</p>
           </div>
-          <div class="p-3 bg-green-100 rounded-full text-green-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+          <div class="p-2 sm:p-3 bg-green-100 rounded-full text-green-600">
+            <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
           </div>
         </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="card p-4 lg:col-span-2 flex flex-col h-auto lg:h-[500px]">
+        <div class="card p-4 lg:col-span-2 flex flex-col h-auto lg:h-[600px]">
           <div class="flex justify-between items-center mb-2 border-b border-gray-100 pb-2">
             <h2 class="text-lg font-bold text-gray-800">市場トレンド</h2>
-            <select id="time-range-selector" class="text-sm border-gray-300 rounded shadow-sm py-1">
+            <select id="time-range-selector" class="text-sm border-gray-300 rounded shadow-sm py-1 px-2">
               </select>
           </div>
           
           <div class="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
-              <div class="flex-1 relative w-full h-[450px] lg:h-full min-h-0">
+              <div class="flex-1 relative w-full h-[500px] lg:h-full min-h-0">
                 <canvas id="combined-chart"></canvas>
               </div>
-              <div class="w-full lg:w-64 lg:border-l lg:pl-4 border-gray-200 overflow-y-auto">
-                  <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">銘柄一覧 (クリックで切替)</h3>
-                  <div id="chart-legend" class="grid grid-cols-1 gap-1">
+              
+              <div class="w-full lg:w-64 lg:border-l lg:pl-4 border-gray-200">
+                  <div class="flex justify-between items-center mb-2 cursor-pointer lg:cursor-default bg-gray-50 lg:bg-transparent p-2 lg:p-0 rounded" onclick="toggleAccordion('legend-content', 'legend-icon')">
+                      <h3 class="text-xs font-bold text-gray-600 uppercase">銘柄一覧</h3>
+                      <div class="flex items-center gap-2">
+                          <label class="flex items-center gap-1 cursor-pointer select-none">
+                              <input type="checkbox" id="toggle-all-stocks" class="form-checkbox h-3 w-3 text-indigo-600 rounded" checked>
+                              <span class="text-[10px] text-indigo-600 font-bold">全選択/解除</span>
+                          </label>
+                          <svg id="legend-icon" class="w-4 h-4 text-gray-500 lg:hidden accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                       </div>
+                  </div>
+                  
+                  <div id="legend-content" class="accordion-content lg:max-h-full overflow-y-auto lg:h-[calc(100%-2rem)]">
+                      <div id="chart-legend" class="grid grid-cols-1 gap-1">
+                          </div>
+                  </div>
               </div>
           </div>
         </div>
 
-        <div class="space-y-6">
-          <div class="card p-4">
-            <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">News / Events</h3>
-            <ul id="event-list" class="space-y-3 text-sm">
-              <li class="text-gray-400 text-xs">情報を取得中...</li>
-            </ul>
+        <div class="space-y-4 lg:space-y-6">
+          <div class="card p-0 lg:p-4 overflow-hidden">
+            <div class="p-4 lg:p-0 flex justify-between items-center cursor-pointer lg:cursor-default" onclick="toggleAccordion('event-content', 'event-icon')">
+                <h3 class="text-sm font-bold text-gray-500 uppercase">News / Events</h3>
+                <svg id="event-icon" class="w-4 h-4 text-gray-500 lg:hidden accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
+            <div id="event-content" class="accordion-content lg:max-h-full px-4 pb-4 lg:px-0 lg:pb-0">
+                <ul id="event-list" class="space-y-3 text-sm mt-2 lg:mt-3">
+                  <li class="text-gray-400 text-xs">情報を取得中...</li>
+                </ul>
+            </div>
           </div>
-          <div class="card p-4 bg-yellow-50 border-yellow-200">
-            <h3 class="text-sm font-bold text-yellow-700 uppercase mb-3 flex items-center gap-2">
-              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
-              Messages
-            </h3>
-            <ul id="message-list" class="space-y-2 text-sm text-gray-700 max-h-48 overflow-y-auto">
-              <li class="text-gray-400 text-xs">メッセージなし</li>
-            </ul>
+
+          <div class="card p-0 lg:p-4 bg-yellow-50 border-yellow-200 overflow-hidden">
+            <div class="p-4 lg:p-0 flex justify-between items-center cursor-pointer lg:cursor-default" onclick="toggleAccordion('message-content', 'message-icon')">
+                <h3 class="text-sm font-bold text-yellow-700 uppercase flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
+                  Messages
+                </h3>
+                <svg id="message-icon" class="w-4 h-4 text-yellow-700 lg:hidden accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
+            <div id="message-content" class="accordion-content lg:max-h-full px-4 pb-4 lg:px-0 lg:pb-0">
+                <ul id="message-list" class="space-y-2 text-sm text-gray-700 max-h-48 overflow-y-auto mt-2 lg:mt-3">
+                  <li class="text-gray-400 text-xs">メッセージなし</li>
+                </ul>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="card overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <h2 class="text-lg font-bold text-gray-800">ポートフォリオ管理</h2>
-          
-          <div class="flex gap-3">
-              <button onclick="manualRefreshPlayer()" id="refresh-btn" class="text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg flex items-center gap-2 transition shadow">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                  <span>情報を更新</span>
-              </button>
-
-              <a id="bulk-order-btn" href="#" target="_blank" class="text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-4 py-2 rounded-lg flex items-center gap-2 transition border border-indigo-100">
-                フォームを開く <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-              </a>
-          </div>
+        <div class="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+          <h2 class="text-lg font-bold text-gray-800">ポートフォリオ</h2>
+          <a id="bulk-order-btn" href="#" target="_blank" class="text-xs sm:text-sm font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-2 rounded-lg flex items-center gap-1 transition border border-indigo-100">
+            フォーム <svg class="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+          </a>
         </div>
         
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">銘柄名</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">現在値</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">保有数</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">評価額</th>
-                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">アクション</th>
+                <th class="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">注文</th>
+                <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">銘柄名</th>
+                <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">現在値</th>
+                <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">保有数</th>
+                <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">評価額</th>
               </tr>
             </thead>
             <tbody id="portfolio-table-body" class="bg-white divide-y divide-gray-200">
@@ -210,74 +237,85 @@
   <script>
     (function() {
       // =========================================================================
-      // ★★★ ユーザー設定エリア (User Settings) ★★★
+      // ★★★ ユーザー設定エリア ★★★
       // =========================================================================
-
-      // 1. GASウェブアプリのURL
       const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwGrdHT3-83v4_UHejIaXgELoGe9xHObNTsYwOZKTTOiApvVvIGA6WC_YM7Ba1dx2pr2Q/exec";
-
-      // 2. 画面リフレッシュ間隔 (ミリ秒) - 1秒ごとに時計を進める
       const UI_REFRESH_INTERVAL = 1000;
-
-      // 3. チャートの時間範囲プルダウン
+      
       const TIME_RANGE_OPTIONS = [
-          { label: '5分', value: 5 }, 
-          { label: '10分', value: 10 },
-          { label: '30分', value: 30 }, 
-          { label: '60分', value: 60 },
-          { label: '全期間', value: 720 }
+          { label: '5分', value: 5 }, { label: '10分', value: 10 },
+          { label: '30分', value: 30 }, { label: '60分', value: 60 }, { label: '全期間', value: 720 }
       ];
 
-      // 4. アカウント登録フォームのURL
       const ACCOUNT_REGISTER_URL = "https://docs.google.com/forms/d/e/1FAIpQLSemSzfTWxwddd_nB1sq-dQFyR1_AHUIM-nGj-WIq1JZzvFNrA/viewform?usp=header";
-
-      // 5. 注文フォーム関連設定
       const FORM_BASE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdoja9xkNFAAcl8zVG1887ecImnNNrmNlSVzG7c_10yZWOG-A/formResponse";
       const VIEW_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdoja9xkNFAAcl8zVG1887ecImnNNrmNlSVzG7c_10yZWOG-A/viewform";
       
       const FIELD_IDS = {
-        entryType: "entry.106548036", 
-        stockName: "entry.351651094", 
-        quantity: "entry.921771076",  
-        playerName: "entry.793982397",
-        password: "entry.625519360"   
+        entryType: "entry.106548036", stockName: "entry.351651094", 
+        quantity: "entry.921771076", playerName: "entry.793982397", password: "entry.625519360"
       };
 
-      // 6. グラフの色パレット
-      const COLOR_PALETTE = [
-          "#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#6366f1", "#84cc16", "#ec4899"
-      ];
-
-      // =========================================================================
-      // ★★★ 設定エリア終了 ★★★
+      const COLOR_PALETTE = ["#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#6366f1", "#84cc16", "#ec4899"];
       // =========================================================================
 
       const STOCK_DATA_URL = `${GAS_API_URL}?type=stock`; 
       
       let state = {
-        pricesSchedule: [],
-        eventsSchedule: [],
-        activeStocks: new Set(),
-        playerInfo: null, 
-        currentPrices: {}, 
-        previousPricesForAnimation: {}, 
-        chart: null,
-        historyMinutes: 10,
-        stockColors: {},
-        lastFetchTime: 0
+        pricesSchedule: [], eventsSchedule: [], activeStocks: new Set(),
+        playerInfo: null, currentPrices: {}, previousPricesForAnimation: {}, 
+        chart: null, historyMinutes: 10, stockColors: {}, lastFetchTime: 0,
+        isInitialized: false // 初回初期化フラグ
       };
 
-      // 初期化 & ログイン処理
+      // --- アコーディオン制御 (モバイル用) ---
+      window.toggleAccordion = function(contentId, iconId) {
+          // PCサイズ(1024px以上)では無効化
+          if (window.innerWidth >= 1024) return;
+          
+          const content = document.getElementById(contentId);
+          const icon = document.getElementById(iconId);
+          content.classList.toggle('collapsed');
+          if(icon) icon.classList.toggle('rotate');
+      };
+
+      // --- 全選択/解除 ---
+      const toggleAllCheckbox = document.getElementById('toggle-all-stocks');
+      toggleAllCheckbox.addEventListener('change', (e) => {
+          if (e.target.checked) {
+              Object.keys(state.currentPrices).forEach(n => state.activeStocks.add(n));
+          } else {
+              state.activeStocks.clear();
+          }
+          renderUI();
+      });
+
+      // --- 手動更新 ---
+      window.manualRefreshPlayer = function() {
+          const btn = document.getElementById('refresh-btn');
+          const originalContent = btn.innerHTML;
+          
+          btn.disabled = true;
+          btn.classList.add('opacity-75', 'cursor-not-allowed');
+          btn.innerHTML = `<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+
+          fetchPlayerData().then(() => {
+              btn.innerHTML = originalContent;
+              btn.disabled = false;
+              btn.classList.remove('opacity-75', 'cursor-not-allowed');
+              // 更新時刻反映
+              const now = new Date();
+              document.getElementById('data-last-updated').textContent = now.toLocaleTimeString('ja-JP');
+          });
+      };
+
+      // --- ログイン・初期化 ---
       const loginForm = document.getElementById('login-form');
-      const registerLink = document.getElementById('register-link');
-      if(registerLink) registerLink.href = ACCOUNT_REGISTER_URL;
+      document.getElementById('register-link').href = ACCOUNT_REGISTER_URL;
 
       const savedPlayer = sessionStorage.getItem('stock_game_player');
       const savedPass = sessionStorage.getItem('stock_game_pass');
-
-      if(savedPlayer && savedPass) {
-        startDashboard(savedPlayer, savedPass);
-      }
+      if(savedPlayer && savedPass) startDashboard(savedPlayer, savedPass);
 
       loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -295,71 +333,31 @@
         location.reload();
       };
 
-      // ★手動更新ボタン用関数
-      window.manualRefreshPlayer = function() {
-          const btn = document.getElementById('refresh-btn');
-          const originalText = btn.innerHTML;
-          
-          // ボタンをローディング状態にする
-          btn.disabled = true;
-          btn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 更新中...`;
-          btn.classList.add('opacity-75');
-
-          // プレイヤー情報を取得
-          fetchPlayerData().then(() => {
-              // 完了したら元に戻す
-              btn.innerHTML = originalText;
-              btn.disabled = false;
-              btn.classList.remove('opacity-75');
-              
-              // 成功エフェクト
-              btn.classList.add('bg-green-600');
-              setTimeout(() => btn.classList.remove('bg-green-600'), 1000);
-          });
-      };
-
       function startDashboard(name, pass) {
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('dashboard-screen').classList.remove('hidden');
         document.getElementById('display-player-name').textContent = name;
         
-        // 1. 株価スケジュール取得（1回のみ）
         fetchStockSchedule();
-
-        // 2. プレイヤー情報取得（1回のみ、あとは手動）
-        fetchPlayerData();
-
-        // 3. UIの定期更新（通信なし、時計を進めるだけ）
+        manualRefreshPlayer(); // 初回データ取得
         setInterval(renderUI, UI_REFRESH_INTERVAL);
-        
         initTimeRangeSelector();
       }
 
-      // --- データ取得ロジック ---
-
-      // A. 株価スケジュールの一括取得
+      // --- データ取得 ---
       async function fetchStockSchedule() {
         try {
           const res = await fetch(`${STOCK_DATA_URL}&t=${Date.now()}`, { method: 'GET', redirect: 'follow' });
-          if (!res.ok) throw new Error("Stock fetch failed");
           const json = await res.json();
-          
           if(json && json[0]) {
-            // データをパースしてStateに保存
             state.pricesSchedule = json[0].prices_schedule.map(d => ({...d, time_date: new Date(d.time_absolute_iso)}));
             state.pricesSchedule.sort((a,b) => a.time_date - b.time_date);
-            
             state.eventsSchedule = json[0].events_schedule.map(d => ({...d, time_date: new Date(d.time_absolute_iso)}));
-            
-            // 即時描画
             renderUI();
           }
-        } catch (e) {
-          console.error("Stock data error:", e);
-        }
+        } catch (e) { console.error(e); }
       }
 
-      // B. プレイヤー情報の取得
       async function fetchPlayerData() {
         const playerName = sessionStorage.getItem('stock_game_player');
         const password = sessionStorage.getItem('stock_game_pass');
@@ -369,78 +367,94 @@
            const params = new URLSearchParams({ playerName, password });
            const res = await fetch(`${GAS_API_URL}?${params.toString()}`, { method: 'GET', redirect: 'follow' });
            const json = await res.json();
-
            if(json.success) {
              state.playerInfo = json.data;
-             updatePortfolioUI(); // 取得したら即反映
+             updatePortfolioUI();
            } else {
-             alert("情報の更新に失敗しました: " + json.message);
+             alert("更新エラー: " + json.message);
            }
-        } catch(e) {
-           console.error("Player data error:", e);
-           alert("通信エラーが発生しました");
-        }
+        } catch(e) { console.error(e); }
       }
 
-      // --- UI描画ループ (renderUI) ---
+      // --- UI描画 (Clock Tick) ---
       function renderUI() {
-        // 現在時刻を表示
-        const now = new Date();
-        document.getElementById('last-updated').textContent = now.toLocaleTimeString('ja-JP');
-
-        // データがまだなければ終了
         if (state.pricesSchedule.length === 0) return;
-
-        // 現在時刻に基づき、表示すべきデータを特定
+        
+        const now = new Date();
         const schedule = [...state.pricesSchedule];
-        // 過去のデータの中で最も新しいものを探す
         const latestEntry = schedule.slice().reverse().find(e => e.time_date <= now);
 
         if(latestEntry) {
-          // アニメーション用に前回の価格を保持
           const oldPrices = {...state.previousPricesForAnimation};
-          
-          // 現在価格を更新
-          latestEntry.prices.forEach(p => {
-            state.currentPrices[p.name] = p.price;
-          });
+          latestEntry.prices.forEach(p => { state.currentPrices[p.name] = p.price; });
           state.previousPricesForAnimation = {...state.currentPrices};
 
-          // 初回のアクティブ銘柄設定
-          if(state.activeStocks.size === 0) {
+          // 初回のみアクティブ銘柄をセット (バグ修正: フラグ管理)
+          if (!state.isInitialized) {
             latestEntry.prices.forEach(p => state.activeStocks.add(p.name));
+            state.isInitialized = true;
           }
 
-          // 各コンポーネントを更新
           updateChart();
           updateLegend(oldPrices); 
           updateEvents(now);
-          // ポートフォリオの評価額も現在価格に合わせて再計算
-          updatePortfolioUI();
+          updateRealtimeAssets(); // リアルタイム資産計算
+          updatePortfolioUI();    // テーブル内の現在値更新
         }
       }
 
-      // --- 補助関数群 (グラフ・凡例・ポートフォリオ) ---
+      // --- リアルタイム資産計算 ---
+      function updateRealtimeAssets() {
+          if (!state.playerInfo) return;
+          const cash = state.playerInfo.cash;
+          let stockValue = 0;
+          
+          state.playerInfo.stockNames.forEach((name, i) => {
+              const holding = state.playerInfo.stockHoldings[i];
+              const currentPrice = state.currentPrices[name] || 0;
+              stockValue += holding * currentPrice;
+          });
 
+          const total = cash + stockValue;
+          
+          document.getElementById('total-assets').textContent = `¥ ${total.toLocaleString()}`;
+          document.getElementById('cash-assets').textContent = `¥ ${cash.toLocaleString()}`;
+      }
+
+      // --- Y軸目盛り計算 (均等幅 & キリの良い数値) ---
       function calculateNiceScale(min, max) {
         if (min === max) { min -= 100; max += 100; }
-        let range = max - min;
-        let tentativeMin = min - (range * 0.1);
-        let tentativeMax = max + (range * 0.1);
-        if (tentativeMin < 0) tentativeMin = 0;
-        const magnitude = Math.pow(10, Math.floor(Math.log10(max - min || 1)));
-        const interval = magnitude;
-        const niceMin = Math.floor(tentativeMin / interval) * interval;
-        const niceMax = Math.ceil(tentativeMax / interval) * interval;
-        return { min: niceMin, max: niceMax };
+        
+        // 少し余白を持たせる
+        let rawRange = max - min;
+        let tentativeMin = Math.max(0, min - (rawRange * 0.1));
+        let tentativeMax = max + (rawRange * 0.1);
+        let range = tentativeMax - tentativeMin;
+
+        // ステップ数を概ね 5~8 程度にする
+        const targetSteps = 5;
+        const roughStep = range / targetSteps;
+
+        // キリの良いステップ幅を計算 (例: 10, 20, 50, 100...)
+        const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+        const normalizedStep = roughStep / magnitude;
+        
+        let stepSize;
+        if (normalizedStep < 1.5) stepSize = 1 * magnitude;
+        else if (normalizedStep < 3) stepSize = 2 * magnitude;
+        else if (normalizedStep < 7) stepSize = 5 * magnitude;
+        else stepSize = 10 * magnitude;
+
+        const niceMin = Math.floor(tentativeMin / stepSize) * stepSize;
+        const niceMax = Math.ceil(tentativeMax / stepSize) * stepSize;
+
+        return { min: niceMin, max: niceMax, stepSize: stepSize };
       }
 
       function updateChart() {
         const ctx = document.getElementById('combined-chart').getContext('2d');
         const now = Date.now();
         const rangeMs = state.historyMinutes * 60 * 1000;
-        
-        // フィルタリング
         const filtered = state.pricesSchedule.filter(d => d.time_date.getTime() >= (now - rangeMs) && d.time_date.getTime() <= now);
         
         const stockNames = Object.keys(state.currentPrices);
@@ -459,9 +473,19 @@
 
         let allValues = filtered.flatMap(d => d.prices.filter(p => state.activeStocks.has(p.name)).map(p => p.price));
         if(allValues.length === 0) allValues = [1000];
+        
         const rawMin = Math.min(...allValues);
         const rawMax = Math.max(...allValues);
-        const { min, max } = calculateNiceScale(rawMin, rawMax);
+        const { min, max, stepSize } = calculateNiceScale(rawMin, rawMax);
+
+        const options = {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'H:mm' } } },
+              y: { position: 'right', min: min, max: max, ticks: { stepSize: stepSize } } // stepSize指定
+            }
+        };
 
         if (state.chart) {
           state.chart.data.datasets = datasets;
@@ -469,20 +493,10 @@
           state.chart.options.scales.x.max = now;
           state.chart.options.scales.y.min = min;
           state.chart.options.scales.y.max = max;
+          state.chart.options.scales.y.ticks.stepSize = stepSize;
           state.chart.update('none');
         } else {
-          state.chart = new Chart(ctx, {
-            type: 'line',
-            data: { datasets },
-            options: {
-              responsive: true, maintainAspectRatio: false, animation: false,
-              plugins: { legend: { display: false } },
-              scales: {
-                x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'H:mm' } } },
-                y: { position: 'right', min: min, max: max }
-              }
-            }
-          });
+          state.chart = new Chart(ctx, { type: 'line', data: { datasets }, options: options });
         }
       }
 
@@ -493,23 +507,19 @@
         const now = new Date();
         const reversedSchedule = state.pricesSchedule.slice().reverse();
         const currentEntryIndex = reversedSchedule.findIndex(e => e.time_date <= now);
-        const prevEntry = (currentEntryIndex !== -1 && currentEntryIndex + 1 < reversedSchedule.length) 
-                          ? reversedSchedule[currentEntryIndex + 1] 
-                          : null;
+        const prevEntry = (currentEntryIndex !== -1 && currentEntryIndex + 1 < reversedSchedule.length) ? reversedSchedule[currentEntryIndex + 1] : null;
 
         Object.entries(state.currentPrices).forEach(([name, price]) => {
           const item = document.createElement('div');
           const isActive = state.activeStocks.has(name);
           const color = getColor(name);
           
-          let diff = 0;
-          let ratio = 0;
+          let diff = 0, ratio = 0;
           if (prevEntry) {
               const prevPriceObj = prevEntry.prices.find(p => p.name === name);
               if (prevPriceObj) {
-                  const prevVal = prevPriceObj.price;
-                  diff = price - prevVal;
-                  ratio = prevVal !== 0 ? (diff / prevVal * 100) : 0;
+                  diff = price - prevPriceObj.price;
+                  ratio = prevPriceObj.price !== 0 ? (diff / prevPriceObj.price * 100) : 0;
               }
           }
           
@@ -524,7 +534,14 @@
           }
 
           item.className = `legend-item ${!isActive ? 'inactive' : ''} ${animClass}`;
-          item.onclick = () => toggleStock(name);
+          item.onclick = () => {
+              if(state.activeStocks.has(name)) state.activeStocks.delete(name);
+              else state.activeStocks.add(name);
+              // 全選択チェックボックスの状態更新
+              const allCount = Object.keys(state.currentPrices).length;
+              toggleAllCheckbox.checked = state.activeStocks.size === allCount;
+              renderUI();
+          };
           
           item.innerHTML = `
             <div class="legend-left">
@@ -543,9 +560,6 @@
       function updatePortfolioUI() {
         if (!state.playerInfo) return;
         const p = state.playerInfo;
-
-        document.getElementById('total-assets').textContent = `¥ ${p.totalAssets.toLocaleString()}`;
-        document.getElementById('cash-assets').textContent = `¥ ${p.cash.toLocaleString()}`;
 
         const msgList = document.getElementById('message-list');
         if(p.messages && p.messages.length > 0) {
@@ -575,19 +589,19 @@
 
           html += `
             <tr class="hover:bg-gray-50 transition">
-              <td class="px-6 py-4 whitespace-nowrap">
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-center text-sm font-medium space-x-1 sm:space-x-2">
+                 <a href="${sellDisabled ? '#' : sellUrl}" target="_blank" class="inline-block px-2 sm:px-3 py-1 rounded text-xs font-bold transition ${sellClass}" ${sellDisabled ? 'onclick="return false;"' : ''}>売</a>
+                 <a href="${buyUrl}" target="_blank" class="inline-block px-2 sm:px-3 py-1 rounded text-xs font-bold bg-green-50 text-green-600 hover:bg-green-100 transition">買</a>
+              </td>
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
                   <div class="w-2 h-2 rounded-full mr-2" style="background-color: ${getColor(name)}"></div>
                   <div class="text-sm font-bold text-gray-900">${name}</div>
                 </div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600">¥ ${currentPrice.toLocaleString()}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-800">${holding.toLocaleString()} 株</td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-mono text-gray-600">¥ ${valuation.toLocaleString()}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium space-x-2">
-                 <a href="${sellDisabled ? '#' : sellUrl}" target="_blank" class="inline-block px-3 py-1 rounded text-xs font-bold transition ${sellClass}" ${sellDisabled ? 'onclick="return false;"' : ''}>売</a>
-                 <a href="${buyUrl}" target="_blank" class="inline-block px-3 py-1 rounded text-xs font-bold bg-green-50 text-green-600 hover:bg-green-100 transition">買</a>
-              </td>
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600">¥ ${currentPrice.toLocaleString()}</td>
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-800">${holding.toLocaleString()}</td>
+              <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-mono text-gray-600">¥ ${valuation.toLocaleString()}</td>
             </tr>
           `;
         });
@@ -615,13 +629,6 @@
         const index = Object.keys(state.stockColors).length;
         state.stockColors[name] = COLOR_PALETTE[index % COLOR_PALETTE.length];
         return state.stockColors[name];
-      }
-
-      function toggleStock(name) {
-        if(state.activeStocks.has(name)) state.activeStocks.delete(name);
-        else state.activeStocks.add(name);
-        // UI全体を再描画（チャートと凡例のハイライト状態を更新）
-        renderUI();
       }
 
       function initTimeRangeSelector() {
