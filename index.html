@@ -7,419 +7,489 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <title>お株ゲーム 統合ダッシュボード</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <title>お株ゲーム 統合プラットフォーム</title>
   
   <style>
-    body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-    /* ローディングオーバーレイ */
-    #loading-overlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(255,255,255,0.9); z-index: 50; display: none;
-      justify-content: center; align-items: center; flex-direction: column;
-    }
-    /* iframeのレスポンシブ対応 */
-    .iframe-container {
-      width: 100%;
-      height: 800px; /* 初期の高さ */
-      border: none;
-      border-radius: 0.75rem;
-      background-color: white;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-    /* チャートの高さ */
-    .chart-container-height { height: 400px; }
-    @media (max-width: 768px) { .chart-container-height { height: 300px; } }
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+    .card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
+    
+    /* アニメーション */
+    @keyframes flash-green { 0% { background-color: #dcfce7; } 100% { background-color: transparent; } }
+    @keyframes flash-red { 0% { background-color: #fee2e2; } 100% { background-color: transparent; } }
+    .flash-up { animation: flash-green 1s ease-out; }
+    .flash-down { animation: flash-red 1s ease-out; }
   </style>
 </head>
-<body>
+<body class="text-gray-800">
 
-  <div id="login-screen" class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
-      <div class="text-center">
-        <h2 class="text-3xl font-extrabold text-gray-900">お株ゲーム</h2>
-        <p class="mt-2 text-sm text-gray-600">プレイヤー情報を入力してログインしてください</p>
+  <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-white p-8 rounded-xl shadow-xl border border-gray-100">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-extrabold text-indigo-600">Market Trader</h1>
+        <p class="text-gray-500 mt-2">お株ゲームへようこそ</p>
       </div>
-      <form class="mt-8 space-y-6" id="login-form">
-        <div class="rounded-md shadow-sm -space-y-px">
-          <div>
-            <label for="player-name" class="sr-only">プレイヤー名</label>
-            <input id="player-name" name="player-name" type="text" required class="appearance-none rounded-none rounded-t-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" placeholder="プレイヤー名">
-          </div>
-          <div>
-            <label for="password" class="sr-only">パスワード</label>
-            <input id="password" name="password" type="password" required class="appearance-none rounded-none rounded-b-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" placeholder="パスワード">
-          </div>
-        </div>
-
+      <form id="login-form" class="space-y-6">
         <div>
-          <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-            ログインして開始
-          </button>
+          <label class="block text-sm font-medium text-gray-700">プレイヤー名</label>
+          <input id="player-name" type="text" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
         </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">パスワード</label>
+          <input id="password" type="password" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+        <button type="submit" class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition duration-200">
+          ログイン
+        </button>
       </form>
-      <div class="text-center text-xs text-gray-400 mt-4">
-        <p>デモ用: プレイヤー名 "DEMO", パスワード "demo"</p>
+      <div class="mt-6 text-center text-xs text-gray-400">
+        DEMO LOGIN: ID "DEMO" / PW "demo"
       </div>
     </div>
   </div>
 
-  <div id="dashboard-screen" class="hidden min-h-screen pb-10">
+  <div id="dashboard-screen" class="hidden min-h-screen pb-12">
     
-    <header class="bg-white shadow mb-6">
-      <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-gray-900">マーケット情報</h1>
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
         <div class="flex items-center gap-4">
-            <span class="text-sm text-gray-500">最終更新: <span id="last-updated">--</span></span>
-            <button onclick="logout()" class="text-sm text-red-600 hover:text-red-800 font-medium">ログアウト</button>
+          <h1 class="text-xl font-bold text-indigo-600">Market Trader</h1>
+          <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-medium">
+            Player: <span id="display-player-name">--</span>
+          </span>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="text-right hidden sm:block">
+            <div class="text-[10px] text-gray-400">MARKET TIME</div>
+            <div id="last-updated" class="text-sm font-mono font-medium">--:--:--</div>
+          </div>
+          <button onclick="logout()" class="text-sm text-gray-500 hover:text-red-600 transition">ログアウト</button>
         </div>
       </div>
     </header>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        
-        <div class="bg-white overflow-hidden shadow rounded-lg p-4">
-            <div class="flex justify-between items-center mb-4 border-b pb-2">
-                <h2 class="text-lg font-medium text-gray-900">株価推移チャート (5秒更新)</h2>
-                <select id="time-range-selector" class="border border-gray-300 rounded text-sm p-1">
-                    </select>
-            </div>
-            <div class="flex flex-col md:flex-row gap-4 chart-container-height">
-                <div class="flex-1 relative w-full h-full min-w-0">
-                    <canvas id="combined-chart"></canvas>
-                </div>
-                <div class="w-full md:w-64 border-l pl-0 md:pl-4 overflow-y-auto h-full text-sm">
-                    <div id="legend-list" class="space-y-2"></div>
-                </div>
-            </div>
-            <div id="price-board" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 mt-4 pt-4 border-t"></div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="card p-6 flex items-center justify-between bg-gradient-to-r from-blue-50 to-white">
+          <div>
+            <p class="text-sm text-gray-500 font-medium">総資産評価額 (Total Assets)</p>
+            <p id="total-assets" class="text-3xl font-bold text-gray-900 mt-1">¥ ---</p>
+          </div>
+          <div class="p-3 bg-blue-100 rounded-full text-blue-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+        </div>
+        <div class="card p-6 flex items-center justify-between">
+          <div>
+            <p class="text-sm text-gray-500 font-medium">現金余力 (Cash)</p>
+            <p id="cash-assets" class="text-3xl font-bold text-gray-900 mt-1">¥ ---</p>
+          </div>
+          <div class="p-3 bg-green-100 rounded-full text-green-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="card p-4 lg:col-span-2 flex flex-col h-[450px]">
+          <div class="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+            <h2 class="text-lg font-bold text-gray-800">市場トレンド</h2>
+            <select id="time-range-selector" class="text-sm border-gray-300 rounded shadow-sm py-1">
+              </select>
+          </div>
+          <div class="flex-1 relative min-h-0">
+            <canvas id="combined-chart"></canvas>
+          </div>
+          <div id="price-ticker" class="mt-4 flex gap-4 overflow-x-auto pb-2 scrollbar-hide"></div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            <div class="bg-white shadow rounded-lg p-4 lg:col-span-1 h-fit">
-                <h2 class="text-lg font-medium text-gray-900 mb-4 border-b pb-2">直近のイベント</h2>
-                <ul id="event-list" class="space-y-3 text-sm">
-                    <li class="text-gray-500">読み込み中...</li>
-                </ul>
-            </div>
-
-            <div class="lg:col-span-2">
-                <div class="flex justify-between items-center mb-2">
-                    <h2 class="text-xl font-bold text-gray-800">マイページ</h2>
-                    <button onclick="reloadPlayerFrame()" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded transition">
-                        情報を更新
-                    </button>
-                </div>
-                <iframe id="player-frame" class="iframe-container" src="about:blank"></iframe>
-                <p class="text-xs text-gray-500 mt-1 text-right">※注文を行うと自動的に情報が更新されます。</p>
-            </div>
+        <div class="space-y-6">
+          <div class="card p-4">
+            <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">News / Events</h3>
+            <ul id="event-list" class="space-y-3 text-sm">
+              <li class="text-gray-400 text-xs">情報を取得中...</li>
+            </ul>
+          </div>
+          <div class="card p-4 bg-yellow-50 border-yellow-200">
+            <h3 class="text-sm font-bold text-yellow-700 uppercase mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
+              Messages
+            </h3>
+            <ul id="message-list" class="space-y-2 text-sm text-gray-700 max-h-48 overflow-y-auto">
+              <li class="text-gray-400 text-xs">メッセージなし</li>
+            </ul>
+          </div>
         </div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+          <h2 class="text-lg font-bold text-gray-800">ポートフォリオ管理</h2>
+          <a id="bulk-order-btn" href="#" target="_blank" class="text-sm font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+            フォームを開く <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+          </a>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">銘柄名</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">現在値</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">保有数</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">評価額</th>
+                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">アクション</th>
+              </tr>
+            </thead>
+            <tbody id="portfolio-table-body" class="bg-white divide-y divide-gray-200">
+              </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </div>
 
   <script>
     (function() {
       // ==========================================
-      // ★設定: ここをあなたのGASウェブアプリURLに変更してください
+      // ★設定: ここをあなたのGASウェブアプリURLに変更
       // ==========================================
-      const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwGrdHT3-83v4_UHejIaXgELoGe9xHObNTsYwOZKTTOiApvVvIGA6WC_YM7Ba1dx2pr2Q/exec"; 
+      const GAS_API_URL = "https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXX/exec"; 
       
+      // Googleフォーム設定
+      const FORM_BASE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdoja9xkNFAAcl8zVG1887ecImnNNrmNlSVzG7c_10yZWOG-A/formResponse";
+      const VIEW_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdoja9xkNFAAcl8zVG1887ecImnNNrmNlSVzG7c_10yZWOG-A/viewform";
+      const FIELD_IDS = {
+        entryType: "entry.106548036",
+        stockName: "entry.351651094",
+        quantity: "entry.921771076",
+        playerName: "entry.793982397",
+        password: "entry.625519360"
+      };
+
       const JSON_FILE_URL = './stock_schedule.json'; 
       const UPDATE_INTERVAL = 5000;
-      const LOCAL_STORAGE_KEY = 'active_stocks_v2'; 
       const TIME_RANGE_OPTIONS = [
-          { label: '直近 5分', value: 5 }, { label: '直近 10分', value: 10 },
-          { label: '直近 30分', value: 30 }, { label: '直近 1時間', value: 60 }
+          { label: '5分', value: 5 }, { label: '10分', value: 10 },
+          { label: '30分', value: 30 }, { label: '60分', value: 60 }
       ];
 
-      // グローバル変数
-      let pricesSchedule = [];
-      let eventsSchedule = [];
-      let ACTIVE_STOCKS = new Set();
-      let stockChart = null;
-      let dynamicStockColors = {};
-      let currentHistoryMinutes = 10;
+      // グローバル状態
+      let state = {
+        pricesSchedule: [],
+        eventsSchedule: [],
+        activeStocks: new Set(),
+        playerInfo: null, // GASから取得したデータ
+        currentPrices: {}, // 銘柄名: 価格 のマップ
+        chart: null,
+        historyMinutes: 10,
+        stockColors: {},
+        lastFetchTime: 0
+      };
+
       const COLOR_PALETTE = ["#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#6366f1", "#84cc16", "#ec4899"];
 
-      // --- ログイン処理 ---
+      // --- 初期化 & ログイン ---
       const loginForm = document.getElementById('login-form');
-      const loginScreen = document.getElementById('login-screen');
-      const dashboardScreen = document.getElementById('dashboard-screen');
-      const playerFrame = document.getElementById('player-frame');
-
-      // ページ読み込み時にセッション確認（簡易的）
+      
+      // セッション復帰
       const savedPlayer = sessionStorage.getItem('stock_game_player');
       const savedPass = sessionStorage.getItem('stock_game_pass');
       if(savedPlayer && savedPass) {
-          startDashboard(savedPlayer, savedPass);
+        startDashboard(savedPlayer, savedPass);
       }
 
       loginForm.addEventListener('submit', (e) => {
-          e.preventDefault();
-          const name = document.getElementById('player-name').value;
-          const pass = document.getElementById('password').value;
-          
-          if(name && pass) {
-              sessionStorage.setItem('stock_game_player', name);
-              sessionStorage.setItem('stock_game_pass', pass);
-              startDashboard(name, pass);
-          }
+        e.preventDefault();
+        const name = document.getElementById('player-name').value;
+        const pass = document.getElementById('password').value;
+        if(name && pass) {
+          sessionStorage.setItem('stock_game_player', name);
+          sessionStorage.setItem('stock_game_pass', pass);
+          startDashboard(name, pass);
+        }
       });
 
       window.logout = function() {
-          sessionStorage.clear();
-          location.reload();
-      };
-
-      window.reloadPlayerFrame = function() {
-          playerFrame.src = playerFrame.src; // iframeのリロード
+        sessionStorage.clear();
+        location.reload();
       };
 
       function startDashboard(name, pass) {
-          // 画面切り替え
-          loginScreen.classList.add('hidden');
-          dashboardScreen.classList.remove('hidden');
-
-          // GASのURLを生成してiframeにセット
-          // encodeURIComponentで日本語や記号を安全に処理
-          const targetUrl = `${GAS_WEB_APP_URL}?playerName=${encodeURIComponent(name)}&password=${encodeURIComponent(pass)}`;
-          playerFrame.src = targetUrl;
-
-          // チャート機能の初期化・開始
-          loadSchedule();
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('dashboard-screen').classList.remove('hidden');
+        document.getElementById('display-player-name').textContent = name;
+        
+        // 初回ロード
+        updateAllData();
+        // 定期実行
+        setInterval(updateAllData, UPDATE_INTERVAL);
+        
+        initTimeRangeSelector();
       }
 
-      // --- 以下、チャート・データ取得ロジック (前回のコードを統合) ---
+      // --- データ取得 (統合版) ---
+      async function updateAllData() {
+        const playerName = sessionStorage.getItem('stock_game_player');
+        const password = sessionStorage.getItem('stock_game_pass');
 
-      function getColorForStock(name) {
-          if (dynamicStockColors[name]) return dynamicStockColors[name];
-          const index = Object.keys(dynamicStockColors).length;
-          const color = COLOR_PALETTE[index % COLOR_PALETTE.length];
-          dynamicStockColors[name] = color;
-          return color;
-      }
-
-      function loadSchedule() {
-          const timestampedUrl = `${JSON_FILE_URL}?t=${new Date().getTime()}`;
-          fetch(timestampedUrl)
-            .then(res => res.json())
-            .then(data => {
-                if (!data || !data[0]) return;
-                pricesSchedule = data[0].prices_schedule;
-                eventsSchedule = data[0].events_schedule;
-
-                [pricesSchedule, eventsSchedule].forEach(arr => {
-                    arr.forEach(d => d.time_date = new Date(d.time_absolute_iso));
-                    arr.sort((a, b) => a.time_date - b.time_date);
-                });
-
-                // 初回のみ実行
-                if(ACTIVE_STOCKS.size === 0) {
-                     const allNames = pricesSchedule.length > 0 ? pricesSchedule[0].prices.map(p => p.name) : [];
-                     loadActiveStocks(allNames);
-                     initTimeRangeSelector();
-                     setInterval(checkAndUpdate, UPDATE_INTERVAL);
-                }
-                checkAndUpdate();
-            })
-            .catch(e => console.error("Data load error:", e));
-      }
-
-      // 定期更新: データのみ再取得
-      function checkAndUpdate() {
-          const timestampedUrl = `${JSON_FILE_URL}?t=${new Date().getTime()}`;
-          fetch(timestampedUrl)
-             .then(res => res.json())
-             .then(data => {
-                 if(!data || !data[0]) return;
-                 // データを更新
-                 const newPrices = data[0].prices_schedule;
-                 newPrices.forEach(d => d.time_date = new Date(d.time_absolute_iso));
-                 newPrices.sort((a, b) => a.time_date - b.time_date);
-                 pricesSchedule = newPrices;
-                 
-                 const newEvents = data[0].events_schedule;
-                 newEvents.forEach(d => d.time_date = new Date(d.time_absolute_iso));
-                 eventsSchedule = newEvents;
-
-                 renderDashboard();
-             });
-      }
-
-      function renderDashboard() {
-          const now = new Date();
-          let latestPriceData = null;
-          let previousPriceData = null;
-
-          // 最新のデータを検索
-          for (let i = 0; i < pricesSchedule.length; i++) {
-              if (pricesSchedule[i].time_date <= now) {
-                  previousPriceData = latestPriceData;
-                  latestPriceData = pricesSchedule[i].prices;
-              } else { break; }
+        try {
+          // 1. 株価データ取得 (JSONファイル)
+          const stockRes = await fetch(`${JSON_FILE_URL}?t=${Date.now()}`);
+          const stockJson = await stockRes.json();
+          
+          if(stockJson && stockJson[0]) {
+            processStockData(stockJson[0]);
           }
-          
-          if (latestPriceData) {
-              updateChart();
-              updateLegend(latestPriceData, previousPriceData);
-              updatePriceBoard(latestPriceData, previousPriceData);
-              updateEvents(now);
-              document.getElementById('last-updated').textContent = now.toLocaleTimeString('ja-JP');
-          }
-      }
 
-      function updateChart() {
-          const ctx = document.getElementById('combined-chart').getContext('2d');
-          const now = Date.now();
-          const historyMs = currentHistoryMinutes * 60 * 1000;
-          
-          // データフィルタリング
-          const filtered = pricesSchedule.filter(e => e.time_date.getTime() >= (now - historyMs) && e.time_date.getTime() <= now);
-          
-          // データセット構築
-          const stockNames = pricesSchedule.length > 0 ? pricesSchedule[0].prices.map(p => p.name) : [];
-          const datasets = stockNames.map(name => {
-              const dataPoints = filtered.map(e => {
-                  const p = e.prices.find(item => item.name === name);
-                  return { x: e.time_date.getTime(), y: p ? p.price : null };
-              });
-              const color = getColorForStock(name);
-              return {
-                  label: name, data: dataPoints, borderColor: color, backgroundColor: color,
-                  borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.1,
-                  hidden: !ACTIVE_STOCKS.has(name)
-              };
+          // 2. プレイヤーデータ取得 (GAS API)
+          // URLパラメータを生成
+          const params = new URLSearchParams({ playerName, password });
+          const playerRes = await fetch(`${GAS_API_URL}?${params.toString()}`, {
+             method: 'GET',
+             redirect: 'follow' // GASのリダイレクトを追跡
           });
+          const playerJson = await playerRes.json();
 
-          // Y軸のスケール計算 (簡易版)
-          let allPrices = filtered.flatMap(e => e.prices.filter(p => ACTIVE_STOCKS.has(p.name)).map(p => p.price));
-          if(allPrices.length === 0) allPrices = [1000];
-          const minP = Math.min(...allPrices);
-          const maxP = Math.max(...allPrices);
-          const margin = (maxP - minP) * 0.1 || 100;
-          
-          if(stockChart) {
-              stockChart.data.datasets = datasets;
-              stockChart.options.scales.x.min = now - historyMs;
-              stockChart.options.scales.x.max = now;
-              stockChart.options.scales.y.min = Math.floor(minP - margin);
-              stockChart.options.scales.y.max = Math.ceil(maxP + margin);
-              stockChart.update('none');
+          if(playerJson.success) {
+            state.playerInfo = playerJson.data;
+            updatePortfolioUI(); // プレイヤー情報描画
           } else {
-              stockChart = new Chart(ctx, {
-                  type: 'line',
-                  data: { datasets },
-                  options: {
-                      responsive: true, maintainAspectRatio: false, animation: false,
-                      plugins: { legend: { display: false } },
-                      scales: {
-                          x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'H:mm' } }, min: now - historyMs, max: now },
-                          y: { min: Math.floor(minP - margin), max: Math.ceil(maxP + margin) }
-                      }
-                  }
-              });
+            console.warn("Auth failed or API error:", playerJson.message);
           }
+          
+          // UI更新時刻
+          document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ja-JP');
+
+        } catch (e) {
+          console.error("Update error:", e);
+        }
       }
 
-      function updateLegend(current, prev) {
-          const container = document.getElementById('legend-list');
-          container.innerHTML = '';
-          current.forEach(item => {
-             const color = getColorForStock(item.name);
-             const div = document.createElement('div');
-             const isActive = ACTIVE_STOCKS.has(item.name);
-             div.className = `flex justify-between items-center p-2 rounded cursor-pointer ${isActive ? 'bg-gray-100' : 'bg-white opacity-50'}`;
-             div.onclick = () => {
-                 if(ACTIVE_STOCKS.has(item.name)) ACTIVE_STOCKS.delete(item.name);
-                 else ACTIVE_STOCKS.add(item.name);
-                 saveActiveStocks(ACTIVE_STOCKS);
-                 renderDashboard();
-             };
-             
-             // 変動計算
-             const prevVal = prev ? (prev.find(p=>p.name===item.name)?.price || item.price) : item.price;
-             const diff = item.price - prevVal;
-             const sign = diff >= 0 ? '+' : '';
-             const textColor = diff > 0 ? 'text-green-600' : (diff < 0 ? 'text-red-600' : 'text-gray-500');
+      // --- データ処理: 株価 ---
+      function processStockData(data) {
+        // データ整形
+        state.pricesSchedule = data.prices_schedule.map(d => ({...d, time_date: new Date(d.time_absolute_iso)}));
+        state.pricesSchedule.sort((a,b) => a.time_date - b.time_date);
+        
+        state.eventsSchedule = data.events_schedule.map(d => ({...d, time_date: new Date(d.time_absolute_iso)}));
+        
+        // 最新価格マップの作成
+        const now = new Date();
+        const latestEntry = [...state.pricesSchedule].reverse().find(e => e.time_date <= now);
+        
+        if(latestEntry) {
+          latestEntry.prices.forEach(p => {
+            state.currentPrices[p.name] = p.price;
+          });
+          
+          // 初回のみアクティブ銘柄設定
+          if(state.activeStocks.size === 0) {
+            latestEntry.prices.forEach(p => state.activeStocks.add(p.name));
+          }
+        }
 
-             div.innerHTML = `
-                <div class="flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-full" style="background:${color}"></span>
-                    <span class="font-bold text-gray-700">${item.name}</span>
-                </div>
-                <div class="text-right">
-                    <div class="font-bold">¥${item.price.toLocaleString()}</div>
-                    <div class="text-xs ${textColor}">${sign}${diff}</div>
-                </div>
-             `;
-             container.appendChild(div);
-          });
+        updateChart();
+        updateTicker();
+        updateEvents(now);
       }
-      
-      function updatePriceBoard(current, prev) {
-          const board = document.getElementById('price-board');
-          board.innerHTML = '';
-          current.forEach(item => {
-              const prevVal = prev ? (prev.find(p=>p.name===item.name)?.price || item.price) : item.price;
-              const diff = item.price - prevVal;
-              const colorClass = diff >= 0 ? 'text-green-600' : 'text-red-600';
-              const bgClass = diff >= 0 ? 'bg-green-50' : 'bg-red-50';
-              
-              const div = document.createElement('div');
-              div.className = `p-2 rounded border ${bgClass} text-center`;
-              div.innerHTML = `
-                 <div class="text-xs text-gray-500 font-bold truncate">${item.name}</div>
-                 <div class="text-lg font-bold text-gray-800">¥${item.price.toLocaleString()}</div>
-                 <div class="text-xs ${colorClass}">${diff >=0 ? '▲':'▼'} ${Math.abs(diff)}</div>
-              `;
-              board.appendChild(div);
+
+      // --- UI描画: チャート ---
+      function updateChart() {
+        const ctx = document.getElementById('combined-chart').getContext('2d');
+        const now = Date.now();
+        const rangeMs = state.historyMinutes * 60 * 1000;
+        
+        const filtered = state.pricesSchedule.filter(d => d.time_date.getTime() >= (now - rangeMs) && d.time_date.getTime() <= now);
+        
+        // 銘柄ごとにデータセット作成
+        const stockNames = Object.keys(state.currentPrices);
+        const datasets = stockNames.map(name => {
+          const color = getColor(name);
+          const data = filtered.map(d => {
+            const p = d.prices.find(item => item.name === name);
+            return { x: d.time_date.getTime(), y: p ? p.price : null };
           });
+          
+          return {
+            label: name, data, borderColor: color, backgroundColor: color,
+            borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.1,
+            hidden: !state.activeStocks.has(name)
+          };
+        });
+
+        // Y軸スケール計算
+        let allValues = filtered.flatMap(d => d.prices.filter(p => state.activeStocks.has(p.name)).map(p => p.price));
+        if(allValues.length === 0) allValues = [1000];
+        const minVal = Math.min(...allValues);
+        const maxVal = Math.max(...allValues);
+        const margin = (maxVal - minVal) * 0.1 || 100;
+
+        if (state.chart) {
+          state.chart.data.datasets = datasets;
+          state.chart.options.scales.x.min = now - rangeMs;
+          state.chart.options.scales.x.max = now;
+          state.chart.options.scales.y.min = Math.floor(minVal - margin);
+          state.chart.options.scales.y.max = Math.ceil(maxVal + margin);
+          state.chart.update('none');
+        } else {
+          state.chart = new Chart(ctx, {
+            type: 'line',
+            data: { datasets },
+            options: {
+              responsive: true, maintainAspectRatio: false, animation: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'H:mm' } } },
+                y: { position: 'right' }
+              }
+            }
+          });
+        }
+      }
+
+      // --- UI描画: プレイヤー情報 (ポートフォリオ) ---
+      function updatePortfolioUI() {
+        if (!state.playerInfo) return;
+        const p = state.playerInfo;
+
+        // 1. 資産カード
+        document.getElementById('total-assets').textContent = `¥ ${p.totalAssets.toLocaleString()}`;
+        document.getElementById('cash-assets').textContent = `¥ ${p.cash.toLocaleString()}`;
+
+        // 2. メッセージ
+        const msgList = document.getElementById('message-list');
+        if(p.messages && p.messages.length > 0) {
+          msgList.innerHTML = p.messages.map(m => `<li class="border-b border-yellow-100 pb-1 last:border-0">${m}</li>`).join('');
+        } else {
+          msgList.innerHTML = '<li class="text-gray-400 text-xs">新着メッセージはありません</li>';
+        }
+
+        // 3. 一括注文ボタンリンク生成
+        const baseParams = `&${FIELD_IDS.playerName}=${encodeURIComponent(p.playerName)}&${FIELD_IDS.password}=${encodeURIComponent(p.password)}`;
+        const bulkLink = `${VIEW_FORM_URL}?${FIELD_IDS.entryType}=&${FIELD_IDS.stockName}=${baseParams}`;
+        document.getElementById('bulk-order-btn').href = bulkLink;
+
+        // 4. テーブル描画
+        const tbody = document.getElementById('portfolio-table-body');
+        let html = '';
+        
+        p.stockNames.forEach((name, i) => {
+          if(!name) return; // 空欄スキップ
+          
+          const holding = p.stockHoldings[i];
+          const currentPrice = state.currentPrices[name] || 0;
+          const valuation = holding * currentPrice;
+          
+          // 注文リンク生成
+          const encodedName = encodeURIComponent(name);
+          const buyUrl = `${FORM_BASE_URL}?${FIELD_IDS.entryType}=${encodeURIComponent('買')}&${FIELD_IDS.stockName}=${encodedName}${baseParams}`;
+          const sellUrl = `${FORM_BASE_URL}?${FIELD_IDS.entryType}=${encodeURIComponent('売')}&${FIELD_IDS.stockName}=${encodedName}&${FIELD_IDS.quantity}=${holding}${baseParams}`;
+
+          // 売りボタンの状態
+          const sellDisabled = holding <= 0;
+          const sellClass = sellDisabled 
+            ? "bg-gray-200 text-gray-400 cursor-not-allowed" 
+            : "bg-red-50 text-red-600 hover:bg-red-100";
+
+          html += `
+            <tr class="hover:bg-gray-50 transition">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center">
+                  <div class="w-2 h-2 rounded-full mr-2" style="background-color: ${getColor(name)}"></div>
+                  <div class="text-sm font-bold text-gray-900">${name}</div>
+                </div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600">
+                ¥ ${currentPrice.toLocaleString()}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-800">
+                ${holding.toLocaleString()} 株
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-mono text-gray-600">
+                ¥ ${valuation.toLocaleString()}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium space-x-2">
+                 <a href="${sellDisabled ? '#' : sellUrl}" target="_blank" class="inline-block px-3 py-1 rounded text-xs font-bold transition ${sellClass}" ${sellDisabled ? 'onclick="return false;"' : ''}>売</a>
+                 <a href="${buyUrl}" target="_blank" class="inline-block px-3 py-1 rounded text-xs font-bold bg-green-50 text-green-600 hover:bg-green-100 transition">買</a>
+              </td>
+            </tr>
+          `;
+        });
+        
+        // 前回のHTMLと比較して変更がある場合のみ更新（チラつき防止）
+        if(tbody.innerHTML !== html) {
+          tbody.innerHTML = html;
+        }
+      }
+
+      // --- その他のUI更新 ---
+      function updateTicker() {
+        const ticker = document.getElementById('price-ticker');
+        ticker.innerHTML = '';
+        Object.entries(state.currentPrices).forEach(([name, price]) => {
+          const item = document.createElement('div');
+          item.className = "flex-shrink-0 bg-white border rounded px-3 py-1 text-xs shadow-sm cursor-pointer hover:bg-gray-50";
+          item.onclick = () => toggleStock(name);
+          
+          const isActive = state.activeStocks.has(name);
+          const color = getColor(name);
+          item.style.borderLeft = `3px solid ${isActive ? color : '#e5e7eb'}`;
+          item.style.opacity = isActive ? '1' : '0.6';
+
+          item.innerHTML = `
+            <span class="font-bold text-gray-700 block">${name}</span>
+            <span class="font-mono text-gray-900">¥${price.toLocaleString()}</span>
+          `;
+          ticker.appendChild(item);
+        });
       }
 
       function updateEvents(now) {
-          const list = document.getElementById('event-list');
-          const recents = eventsSchedule.filter(e => e.time_date <= now).reverse().slice(0, 5);
-          
-          if(recents.length === 0) {
-              list.innerHTML = '<li class="text-gray-400">イベントなし</li>';
-              return;
-          }
-          list.innerHTML = '';
-          recents.forEach(e => {
-              const li = document.createElement('li');
-              li.className = "border-l-4 border-indigo-500 pl-2 py-1";
-              li.innerHTML = `
-                  <div class="font-bold text-gray-800">${e.event_title}</div>
-                  <div class="text-xs text-gray-500">${e.time_date.toLocaleTimeString('ja-JP')}</div>
-              `;
-              list.appendChild(li);
-          });
+        const list = document.getElementById('event-list');
+        const recents = state.eventsSchedule.filter(e => e.time_date <= now).reverse().slice(0, 5);
+        
+        if (recents.length === 0) {
+          list.innerHTML = '<li class="text-gray-400 text-xs">イベント履歴なし</li>';
+        } else {
+          list.innerHTML = recents.map(e => `
+            <li class="pl-3 border-l-2 border-indigo-200">
+              <div class="font-bold text-gray-800">${e.event_title}</div>
+              <div class="text-[10px] text-gray-400">${e.time_date.toLocaleTimeString()}</div>
+            </li>
+          `).join('');
+        }
       }
 
       // --- ユーティリティ ---
+      function getColor(name) {
+        if (state.stockColors[name]) return state.stockColors[name];
+        const index = Object.keys(state.stockColors).length;
+        state.stockColors[name] = COLOR_PALETTE[index % COLOR_PALETTE.length];
+        return state.stockColors[name];
+      }
+
+      function toggleStock(name) {
+        if(state.activeStocks.has(name)) state.activeStocks.delete(name);
+        else state.activeStocks.add(name);
+        updateChart();
+        updateTicker();
+      }
+
       function initTimeRangeSelector() {
-          const sel = document.getElementById('time-range-selector');
-          sel.innerHTML = '';
-          TIME_RANGE_OPTIONS.forEach(o => {
-              const opt = document.createElement('option');
-              opt.value = o.value; opt.textContent = o.label;
-              if(o.value === currentHistoryMinutes) opt.selected = true;
-              sel.appendChild(opt);
-          });
-          sel.onchange = (e) => {
-              currentHistoryMinutes = parseInt(e.target.value);
-              renderDashboard();
-          };
-      }
-      
-      function loadActiveStocks(allNames) {
-          const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-          if(stored) { try { ACTIVE_STOCKS = new Set(JSON.parse(stored)); return; } catch(e){} }
-          allNames.forEach(n => ACTIVE_STOCKS.add(n));
-      }
-      function saveActiveStocks(set) {
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(Array.from(set)));
+        const sel = document.getElementById('time-range-selector');
+        sel.innerHTML = '';
+        TIME_RANGE_OPTIONS.forEach(o => {
+          const opt = document.createElement('option');
+          opt.value = o.value; opt.textContent = o.label;
+          if(o.value === state.historyMinutes) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        sel.onchange = (e) => {
+          state.historyMinutes = parseInt(e.target.value);
+          updateChart();
+        };
       }
 
     })();
