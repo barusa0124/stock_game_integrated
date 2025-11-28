@@ -29,7 +29,7 @@
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-    /* --- 凡例用カスタムCSS (指定デザイン) --- */
+    /* --- 凡例用カスタムCSS --- */
     .legend-item {
         display: flex; align-items: center; justify-content: space-between;
         padding: 0.5rem; border-radius: 0.5rem;
@@ -76,7 +76,7 @@
       </form>
 
       <div class="mt-6 text-center border-t border-gray-100 pt-4">
-        <a href="https://docs.google.com/forms/d/e/1FAIpQLSemSzfTWxwddd_nB1sq-dQFyR1_AHUIM-nGj-WIq1JZzvFNrA/viewform?usp=header" target="_blank" class="text-indigo-600 hover:text-indigo-800 text-sm font-bold flex items-center justify-center gap-1">
+        <a id="register-link" href="#" target="_blank" class="text-indigo-600 hover:text-indigo-800 text-sm font-bold flex items-center justify-center gap-1">
             アカウントをお持ちでない方はこちら
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
         </a>
@@ -141,7 +141,7 @@
           </div>
           
           <div class="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
-              <div class="flex-1 relative w-full h-[300px] lg:h-full min-h-0">
+              <div class="flex-1 relative w-full h-[450px] lg:h-full min-h-0">
                 <canvas id="combined-chart"></canvas>
               </div>
               <div class="w-full lg:w-64 lg:border-l lg:pl-4 border-gray-200 overflow-y-auto">
@@ -200,28 +200,63 @@
 
   <script>
     (function() {
-      // ==========================================
-      // ★設定: 指定されたURLをセット
-      // ==========================================
-      const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwGrdHT3-83v4_UHejIaXgELoGe9xHObNTsYwOZKTTOiApvVvIGA6WC_YM7Ba1dx2pr2Q/exec";
-      
-      const FORM_BASE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdoja9xkNFAAcl8zVG1887ecImnNNrmNlSVzG7c_10yZWOG-A/formResponse";
-      const VIEW_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdoja9xkNFAAcl8zVG1887ecImnNNrmNlSVzG7c_10yZWOG-A/viewform";
-      const FIELD_IDS = {
-        entryType: "entry.106548036",
-        stockName: "entry.351651094",
-        quantity: "entry.921771076",
-        playerName: "entry.793982397",
-        password: "entry.625519360"
-      };
+      // =========================================================================
+      // ★★★ ユーザー設定エリア (User Settings) ★★★
+      // ここにある変数を変更することで、動作の設定を行えます。
+      // =========================================================================
 
-      const STOCK_DATA_URL = `${GAS_API_URL}?type=stock`; 
-      const UPDATE_INTERVAL = 60000;
+      // 1. GASウェブアプリのURL
+      // デプロイしたGASの「ウェブアプリのURL」をここに設定してください。
+      const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwGrdHT3-83v4_UHejIaXgELoGe9xHObNTsYwOZKTTOiApvVvIGA6WC_YM7Ba1dx2pr2Q/exec";
+
+      // 2. 更新間隔 (ミリ秒)
+      // 画面の自動更新間隔です。デフォルト: 10000 = 10秒
+      const UPDATE_INTERVAL = 10000;
+
+      // 3. チャートの時間範囲プルダウンの選択肢
+      // valueは「分」単位です。
       const TIME_RANGE_OPTIONS = [
-          { label: '5分', value: 5 }, { label: '10分', value: 10 },
-          { label: '30分', value: 30 }, { label: '1時間', value: 60 }, { label: '6時間', value: 360 }
+          { label: '5分', value: 5 }, 
+          { label: '10分', value: 10 },
+          { label: '30分', value: 30 }, 
+          { label: '1時間', value: 60 }, 
+          { label: '6時間', value: 360 }
       ];
 
+      // 4. アカウント登録フォームのURL
+      // ログイン画面の「アカウントをお持ちでない方はこちら」のリンク先です。
+      const ACCOUNT_REGISTER_URL = "https://docs.google.com/forms/d/e/1FAIpQLSemSzfTWxwddd_nB1sq-dQFyR1_AHUIM-nGj-WIq1JZzvFNrA/viewform?usp=header";
+
+      // 5. 注文フォーム関連設定 (GoogleフォームのID等)
+      // フォームの送信先URLと、各質問項目のentry IDを設定します。
+      const FORM_BASE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdoja9xkNFAAcl8zVG1887ecImnNNrmNlSVzG7c_10yZWOG-A/formResponse";
+      const VIEW_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdoja9xkNFAAcl8zVG1887ecImnNNrmNlSVzG7c_10yZWOG-A/viewform";
+      
+      const FIELD_IDS = {
+        entryType: "entry.106548036", // 注文タイプ (売/買)
+        stockName: "entry.351651094", // 銘柄名
+        quantity: "entry.921771076",  // 注文株数
+        playerName: "entry.793982397", // プレイヤー名
+        password: "entry.625519360"    // パスワード
+      };
+
+      // 6. グラフの色パレット (銘柄ごとの色)
+      const COLOR_PALETTE = [
+          "#3b82f6", // 青
+          "#10b981", // 緑
+          "#ef4444", // 赤
+          "#f59e0b", // 黄
+          "#6366f1", // インディゴ
+          "#84cc16", // ライム
+          "#ec4899"  // ピンク
+      ];
+
+      // =========================================================================
+      // ★★★ 設定エリア終了 (End of User Settings) ★★★
+      // =========================================================================
+
+      const STOCK_DATA_URL = `${GAS_API_URL}?type=stock`; 
+      
       // グローバル状態
       let state = {
         pricesSchedule: [],
@@ -236,10 +271,13 @@
         lastFetchTime: 0
       };
 
-      const COLOR_PALETTE = ["#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#6366f1", "#84cc16", "#ec4899"];
-
-      // 初期化 & ログイン
+      // 初期化 & ログイン処理
       const loginForm = document.getElementById('login-form');
+      const registerLink = document.getElementById('register-link');
+      
+      // 登録リンクのURLを設定
+      if(registerLink) registerLink.href = ACCOUNT_REGISTER_URL;
+
       const savedPlayer = sessionStorage.getItem('stock_game_player');
       const savedPass = sessionStorage.getItem('stock_game_pass');
 
@@ -402,7 +440,7 @@
         }
       }
 
-      // 凡例更新 (デザイン修正版)
+      // 凡例更新
       function updateLegend(oldPrices) {
         const container = document.getElementById('chart-legend');
         container.innerHTML = '';
@@ -443,7 +481,6 @@
           item.className = `legend-item ${!isActive ? 'inactive' : ''} ${animClass}`;
           item.onclick = () => toggleStock(name);
           
-          // デザイン修正: 指定されたHTML構造を再現
           item.innerHTML = `
             <div class="legend-left">
                 <span class="legend-color" style="background-color: ${color}"></span>
