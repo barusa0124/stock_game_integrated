@@ -181,7 +181,7 @@
                   <div class="flex justify-between items-center mb-2 cursor-pointer lg:cursor-default bg-gray-50 lg:bg-transparent p-3 lg:p-0 rounded" onclick="toggleAccordion('legend-content', 'legend-icon')">
                       <h3 class="text-xs font-bold text-gray-600 uppercase">銘柄一覧</h3>
                       <div class="flex items-center gap-3">
-                          <label class="flex items-center gap-2 cursor-pointer select-none">
+                          <label class="flex items-center gap-2 cursor-pointer select-none" onclick="event.stopPropagation()">
                               <input type="checkbox" id="toggle-all-stocks" class="form-checkbox h-5 w-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" checked>
                               <span class="text-xs text-indigo-600 font-bold">全選択</span>
                           </label>
@@ -234,7 +234,6 @@
             フォーム <svg class="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
           </a>
         </div>
-        
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -248,6 +247,26 @@
             </thead>
             <tbody id="portfolio-table-body" class="bg-white divide-y divide-gray-200">
               </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <h2 class="text-lg font-bold text-gray-800">資産ランキング</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">順位</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">プレイヤー名</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">総資産 (スプレッドシート時点)</th>
+              </tr>
+            </thead>
+            <tbody id="ranking-table-body" class="bg-white divide-y divide-gray-200">
+              <tr><td colspan="3" class="px-4 py-3 text-center text-sm text-gray-500">更新ボタンを押すと表示されます</td></tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -283,13 +302,13 @@
       // =========================================================================
 
       const STOCK_DATA_URL = `${GAS_API_URL}?type=stock`; 
+      const RANKING_DATA_URL = `${GAS_API_URL}?type=ranking`; 
       
       let state = {
         pricesSchedule: [], eventsSchedule: [], activeStocks: new Set(),
         playerInfo: null, currentPrices: {}, previousPricesForAnimation: {}, 
         chart: null, historyMinutes: 10, stockColors: {}, lastFetchTime: 0,
-        isInitialized: false,
-        lastDisplayedEventTime: 0 // 新着イベント判定用
+        isInitialized: false, lastDisplayedEventTime: 0
       };
 
       // --- アコーディオン制御 ---
@@ -321,8 +340,7 @@
           btn.classList.add('opacity-75', 'cursor-not-allowed');
           btn.innerHTML = `<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
 
-          // ★株価データとプレイヤー情報を並行して再取得
-          Promise.all([fetchStockSchedule(), fetchPlayerData()])
+          Promise.all([fetchStockSchedule(), fetchPlayerData(), fetchRankingData()])
             .then(() => {
                 btn.innerHTML = originalContent;
                 btn.disabled = false;
@@ -369,6 +387,7 @@
         
         fetchStockSchedule();
         fetchPlayerData(); // 初回
+        fetchRankingData(); // 初回
         setInterval(renderUI, UI_REFRESH_INTERVAL);
         initTimeRangeSelector();
       }
@@ -400,15 +419,45 @@
              state.playerInfo = json.data;
              updatePortfolioUI();
            } else {
-             // 認証エラー等はここで処理
+             // 認証エラー処理
            }
         } catch(e) { console.error(e); }
+      }
+
+      // ランキングデータ取得と描画
+      async function fetchRankingData() {
+        try {
+          const res = await fetch(`${RANKING_DATA_URL}&t=${Date.now()}`, { method: 'GET', redirect: 'follow' });
+          const ranking = await res.json();
+          
+          if (Array.isArray(ranking)) {
+            const tbody = document.getElementById('ranking-table-body');
+            tbody.innerHTML = ranking.map((r, i) => {
+              const rank = i + 1;
+              let rowClass = "";
+              if (rank === 1) rowClass = "bg-yellow-50";
+              else if (rank === 2) rowClass = "bg-gray-50";
+              else if (rank === 3) rowClass = "bg-orange-50";
+              
+              // 自分を強調
+              const myName = sessionStorage.getItem('stock_game_player');
+              if (r.name === myName) rowClass += " border-l-4 border-indigo-500";
+
+              return `
+                <tr class="${rowClass} hover:bg-indigo-50 transition">
+                  <td class="px-4 py-3 text-sm font-bold text-gray-700">${rank}</td>
+                  <td class="px-4 py-3 text-sm font-medium text-gray-900">${r.name}</td>
+                  <td class="px-4 py-3 text-sm text-right font-mono text-gray-600">¥ ${r.assets.toLocaleString()}</td>
+                </tr>
+              `;
+            }).join('');
+          }
+        } catch (e) { console.error("Ranking fetch error:", e); }
       }
 
       // --- UI描画 (Clock Tick) ---
       function renderUI() {
         const now = new Date();
-        // リアルタイム時計更新
         document.getElementById('header-clock').textContent = now.toLocaleTimeString('ja-JP');
 
         if (state.pricesSchedule.length === 0) return;
@@ -635,15 +684,12 @@
 
       function updateEvents(now) {
         const list = document.getElementById('event-list');
-        // 最新イベント上位5件
         const recents = state.eventsSchedule.filter(e => e.time_date <= now).reverse().slice(0, 5);
-        
         if (recents.length === 0) {
           list.innerHTML = '<li class="text-gray-400 text-xs">イベント履歴なし</li>';
           return;
         }
 
-        // 新着判定 (リストの先頭が新しければアニメーション)
         let isNewEvent = false;
         if (recents.length > 0) {
             const latestTime = recents[0].time_date.getTime();
@@ -653,9 +699,7 @@
             state.lastDisplayedEventTime = latestTime;
         }
 
-        // HTML生成
         const html = recents.map((e, index) => {
-            // 新着かつ最初の要素にクラス付与
             const animClass = (isNewEvent && index === 0) ? 'flash-new-event' : '';
             return `
             <li class="pl-3 border-l-2 border-indigo-200 ${animClass}">
@@ -665,8 +709,6 @@
           `;
         }).join('');
 
-        // 変化があれば更新（DOMのチラつき防止のため比較）
-        // ※ただしアニメーションさせるために新着時は強制更新する
         if (list.innerHTML !== html || isNewEvent) {
             list.innerHTML = html;
         }
