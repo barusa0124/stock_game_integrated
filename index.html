@@ -422,7 +422,7 @@
         } catch(e) { console.error(e); }
       }
 
-      // ランキングデータ取得と描画 (フィルタリング版)
+      // ランキングデータ取得と描画
       async function fetchRankingData() {
         try {
           const res = await fetch(`${RANKING_DATA_URL}&t=${Date.now()}`, { method: 'GET', redirect: 'follow' });
@@ -435,15 +435,9 @@
             const tbody = document.getElementById('ranking-table-body');
             tbody.innerHTML = filteredRanking.map((r, i) => {
               const rank = i + 1;
-              // ★色分け削除: 全行統一デザイン
-              let rowClass = "bg-white";
-              
-              // 自分を強調 (枠線のみ)
-              const myName = sessionStorage.getItem('stock_game_player');
-              if (r.name === myName) rowClass += " border-l-4 border-indigo-500 bg-indigo-50";
-
+              // ★全行統一デザイン (色はつけない)
               return `
-                <tr class="${rowClass} hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
+                <tr class="bg-white hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
                   <td class="px-4 py-3 text-sm font-bold text-gray-700">${rank}</td>
                   <td class="px-4 py-3 text-sm font-medium text-gray-900">${r.name}</td>
                   <td class="px-4 py-3 text-sm text-right font-mono text-gray-600">¥ ${r.assets.toLocaleString()}</td>
