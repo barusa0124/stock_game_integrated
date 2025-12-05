@@ -492,11 +492,12 @@
         const now = new Date();
         document.getElementById('header-clock').textContent = now.toLocaleTimeString('ja-JP');
 
+        // 【修正】株価データの有無に関係なく、ポートフォリオと資産額は常に更新する
         updatePortfolioUI();
+        updateRealtimeAssets(); 
         
         if (state.pricesSchedule.length === 0) {
             document.getElementById('chart-no-data').classList.remove('hidden');
-            updateRealtimeAssets();
             return; 
         } else {
             document.getElementById('chart-no-data').classList.add('hidden');
@@ -518,7 +519,6 @@
           updateChart();
           updateLegend(oldPrices); 
           updateEvents(now);
-          updateRealtimeAssets(); 
         }
       }
 
@@ -655,10 +655,11 @@
               renderUI();
           };
           
+          // 【修正】銘柄名が空の場合は「名称未設定」を表示する安全策を追加
           item.innerHTML = `
             <div class="legend-left">
                 <span class="legend-color" style="background-color: ${color}"></span>
-                <span class="legend-name">${name}</span>
+                <span class="legend-name">${name || '名称未設定'}</span>
             </div>
             <div class="legend-right">
                 <div class="legend-price">¥${price.toLocaleString()}</div>
@@ -676,7 +677,6 @@
         const msgList = document.getElementById('message-list');
         if(p.messages && p.messages.length > 0) {
           const msgsToDisplay = p.messages.slice(0, MAX_MESSAGE_ITEMS);
-          // 修正: 縦線デザインに変更 (pl-3 border-l-2 border-yellow-400)
           msgList.innerHTML = msgsToDisplay.map(m => `
             <li class="pl-3 border-l-2 border-yellow-400 py-1 mb-2">
               <div class="text-gray-800">${m}</div>
