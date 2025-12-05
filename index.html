@@ -144,7 +144,7 @@
     <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 mt-4 space-y-6">
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="card p-4 sm:p-6 flex items-center justify-between">
+        <div class="card p-4 sm:p-6 flex items-center justify-between transition-colors duration-500" id="total-assets-card">
           <div>
             <p class="text-xs sm:text-sm text-gray-500 font-medium mb-1">総資産評価額 (Total assets)</p>
             <p id="total-assets" class="text-2xl sm:text-3xl font-bold text-gray-900">¥ ---</p>
@@ -313,7 +313,8 @@
         chart: null, rankingData: [],
         historyMinutes: INITIAL_CHART_MINUTES,
         stockColors: {}, lastFetchTime: 0,
-        isInitialized: false, lastDisplayedEventTime: 0
+        isInitialized: false, lastDisplayedEventTime: 0,
+        lastTotalAssets: 0 // 【追加】前回の総資産額記憶用
       };
 
       // --- アコーディオン制御 ---
@@ -492,7 +493,7 @@
         const now = new Date();
         document.getElementById('header-clock').textContent = now.toLocaleTimeString('ja-JP');
 
-        // 【修正】株価データの有無に関係なく、ポートフォリオと資産額は常に更新する
+        // 1. 株価データの有無に関係なく、ポートフォリオと資産額は常に更新（ゲーム開始前対策）
         updatePortfolioUI();
         updateRealtimeAssets(); 
         
@@ -519,6 +520,9 @@
           updateChart();
           updateLegend(oldPrices); 
           updateEvents(now);
+          
+          // 2. 株価が更新されたので、総資産額も再計算してアニメーションを発火させる
+          updateRealtimeAssets();
         }
       }
 
@@ -535,8 +539,26 @@
 
           const total = cash + stockValue;
           
+          // --- アニメーション処理 ---
+          const totalEl = document.getElementById('total-assets');
+          
+          // クラス再付与のために一度削除してリフローさせる
+          totalEl.classList.remove('flash-up', 'flash-down');
+          void totalEl.offsetWidth; // 強制リフロー
+
+          // 前回値と比較してアニメーション
+          if (state.lastTotalAssets > 0 && total !== state.lastTotalAssets) {
+              if (total > state.lastTotalAssets) {
+                  totalEl.classList.add('flash-up');
+              } else if (total < state.lastTotalAssets) {
+                  totalEl.classList.add('flash-down');
+              }
+          }
+
           document.getElementById('total-assets').textContent = `¥ ${total.toLocaleString()}`;
           document.getElementById('cash-assets').textContent = `¥ ${cash.toLocaleString()}`;
+          
+          state.lastTotalAssets = total;
       }
 
       function calculateNiceScale(min, max) {
@@ -655,7 +677,6 @@
               renderUI();
           };
           
-          // 【修正】銘柄名が空の場合は「名称未設定」を表示する安全策を追加
           item.innerHTML = `
             <div class="legend-left">
                 <span class="legend-color" style="background-color: ${color}"></span>
