@@ -15,13 +15,14 @@
     .card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
     
     /* アニメーション定義 */
+    /* カード全体用: 終了時はカードの背景色(white)に戻るように修正 */
     @keyframes flash-green { 
       0% { background-color: #dcfce7; box-shadow: 0 0 10px #22c55e; } 
-      100% { background-color: #f9fafb; box-shadow: none; } 
+      100% { background-color: #ffffff; box-shadow: none; } 
     }
     @keyframes flash-red { 
       0% { background-color: #fee2e2; box-shadow: 0 0 10px #ef4444; } 
-      100% { background-color: #f9fafb; box-shadow: none; } 
+      100% { background-color: #ffffff; box-shadow: none; } 
     }
     @keyframes flash-yellow { 
       0% { background-color: #fef08a; border-left-color: #ca8a04; } 
@@ -314,7 +315,7 @@
         historyMinutes: INITIAL_CHART_MINUTES,
         stockColors: {}, lastFetchTime: 0,
         isInitialized: false, lastDisplayedEventTime: 0,
-        lastTotalAssets: 0 // 【追加】前回の総資産額記憶用
+        lastTotalAssets: 0 // 前回総資産
       };
 
       // --- アコーディオン制御 ---
@@ -493,7 +494,7 @@
         const now = new Date();
         document.getElementById('header-clock').textContent = now.toLocaleTimeString('ja-JP');
 
-        // 1. 株価データの有無に関係なく、ポートフォリオと資産額は常に更新（ゲーム開始前対策）
+        // 1. 株価データの有無に関係なく、ポートフォリオと資産額は常に更新
         updatePortfolioUI();
         updateRealtimeAssets(); 
         
@@ -521,7 +522,7 @@
           updateLegend(oldPrices); 
           updateEvents(now);
           
-          // 2. 株価が更新されたので、総資産額も再計算してアニメーションを発火させる
+          // 2. 株価更新に合わせて総資産額アニメーションを発火
           updateRealtimeAssets();
         }
       }
@@ -539,19 +540,19 @@
 
           const total = cash + stockValue;
           
-          // --- アニメーション処理 ---
-          const totalEl = document.getElementById('total-assets');
+          // --- アニメーション処理（カード全体対象） ---
+          const cardEl = document.getElementById('total-assets-card'); // 【修正】IDをカードに変更
           
-          // クラス再付与のために一度削除してリフローさせる
-          totalEl.classList.remove('flash-up', 'flash-down');
-          void totalEl.offsetWidth; // 強制リフロー
+          // クラス再付与のために一度削除してリフロー
+          cardEl.classList.remove('flash-up', 'flash-down');
+          void cardEl.offsetWidth; // 強制リフロー
 
           // 前回値と比較してアニメーション
           if (state.lastTotalAssets > 0 && total !== state.lastTotalAssets) {
               if (total > state.lastTotalAssets) {
-                  totalEl.classList.add('flash-up');
+                  cardEl.classList.add('flash-up');
               } else if (total < state.lastTotalAssets) {
-                  totalEl.classList.add('flash-down');
+                  cardEl.classList.add('flash-down');
               }
           }
 
