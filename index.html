@@ -58,14 +58,6 @@
     .text-red { color: rgb(220, 38, 38); }
     .text-gray { color: #6b7280; }
 
-    /* メッセージリストのデザイン改善 */
-    .message-item {
-        border-bottom: 1px dashed #fcd34d; /* 黄色の破線 */
-        padding-top: 0.5rem;
-        padding-bottom: 0.5rem;
-    }
-    .message-item:last-child { border-bottom: none; }
-
     /* アコーディオン用 */
     .accordion-content { 
         transition: max-height 0.3s ease-out, padding 0.3s ease, opacity 0.3s ease; 
@@ -228,7 +220,7 @@
                 <svg id="message-icon" class="w-5 h-5 text-yellow-700 lg:hidden accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
             </div>
             <div id="message-content" class="accordion-content px-4 pb-4 lg:!p-0 lg:!max-h-none lg:!opacity-100">
-                <ul id="message-list" class="text-sm text-gray-700 max-h-48 overflow-y-auto mt-2 lg:mt-3">
+                <ul id="message-list" class="space-y-2 text-sm text-gray-700 max-h-48 overflow-y-auto mt-2 lg:mt-3">
                   <li class="text-gray-400 text-xs">メッセージなし</li>
                 </ul>
             </div>
@@ -353,7 +345,6 @@
           btn.classList.add('opacity-75', 'cursor-not-allowed');
           btn.innerHTML = `<svg class="animate-spin h-3 w-3 sm:h-4 sm:w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
 
-          // 統合されたデータフェッチ関数を呼ぶ
           fetchGameData()
             .then(() => {
                 btn.innerHTML = originalContent;
@@ -375,7 +366,6 @@
       const savedPlayer = sessionStorage.getItem('stock_game_player');
       const savedPass = sessionStorage.getItem('stock_game_pass');
       
-      // 自動ログイン時も fetchGameData を使って検証する
       if(savedPlayer && savedPass) {
           attemptLogin(savedPlayer, savedPass, true);
       }
@@ -403,7 +393,6 @@
       };
 
       async function attemptLogin(name, pass, isAuto) {
-          // 一時的に保存してfetch
           sessionStorage.setItem('stock_game_player', name);
           sessionStorage.setItem('stock_game_pass', pass);
           
@@ -413,8 +402,7 @@
                   startDashboard(name);
               } else {
                   if(!isAuto) alert("プレイヤー名もしくはパスワードが間違っています");
-                  sessionStorage.clear(); // 失敗したら消す
-                  // 画面は切り替えない
+                  sessionStorage.clear(); 
               }
           } catch(e) {
               console.error(e);
@@ -428,14 +416,12 @@
         document.getElementById('dashboard-screen').classList.remove('hidden');
         document.getElementById('display-player-name').textContent = name;
         
-        // 既にfetchGameDataでデータは取れているので、定期更新を開始
         setInterval(renderUI, UI_REFRESH_INTERVAL);
         initTimeRangeSelector();
-        renderUI(); // 初回描画
+        renderUI(); 
       }
 
       // --- 統合データ取得 ---
-      // 成功なら true, 失敗(認証エラー含む)なら false を返す
       async function fetchGameData() {
         const playerName = sessionStorage.getItem('stock_game_player');
         const password = sessionStorage.getItem('stock_game_pass');
@@ -443,15 +429,12 @@
 
         try {
           const params = new URLSearchParams({ playerName, password });
-          // URLに &t=... をつけることでキャッシュを防ぐ
           const res = await fetch(`${GAS_API_URL}?${params.toString()}&t=${Date.now()}`, { method: 'GET', redirect: 'follow' });
           const json = await res.json();
           
           if(json.success) {
-            // 1. プレイヤー情報更新
             state.playerInfo = json.player;
             
-            // 2. 株価・イベント更新
             if(json.market && json.market[0]) {
                 state.pricesSchedule = json.market[0].prices_schedule.map(d => ({...d, time_date: new Date(d.time_absolute_iso)}));
                 state.pricesSchedule.sort((a,b) => a.time_date - b.time_date);
@@ -461,11 +444,9 @@
                 state.eventsSchedule = [];
             }
             
-            // 3. ランキング更新
             state.rankingData = json.ranking || [];
             updateRankingUI();
 
-            // 最終更新時刻の表示
             const now = new Date();
             document.getElementById('data-last-updated').textContent = now.toLocaleTimeString('ja-JP');
 
@@ -511,26 +492,21 @@
         const now = new Date();
         document.getElementById('header-clock').textContent = now.toLocaleTimeString('ja-JP');
 
-        // 株価データの有無に関わらずプレイヤー情報（メッセージ・ポートフォリオ・現金）は更新する
         updatePortfolioUI();
         
-        // 株価データがない場合（ゲーム開始前など）
         if (state.pricesSchedule.length === 0) {
             document.getElementById('chart-no-data').classList.remove('hidden');
-            // 現金のみ表示して資産計算（株価0として計算される）
             updateRealtimeAssets();
             return; 
         } else {
             document.getElementById('chart-no-data').classList.add('hidden');
         }
         
-        // --- ここから株価がある場合の処理 ---
         const schedule = [...state.pricesSchedule];
         const latestEntry = schedule.slice().reverse().find(e => e.time_date <= now);
 
         if(latestEntry) {
           const oldPrices = {...state.previousPricesForAnimation};
-          // currentPricesを更新
           latestEntry.prices.forEach(p => { state.currentPrices[p.name] = p.price; });
           state.previousPricesForAnimation = {...state.currentPrices};
 
@@ -542,7 +518,7 @@
           updateChart();
           updateLegend(oldPrices); 
           updateEvents(now);
-          updateRealtimeAssets(); // 株価更新後に再計算
+          updateRealtimeAssets(); 
         }
       }
 
@@ -553,7 +529,6 @@
           
           state.playerInfo.stockNames.forEach((name, i) => {
               const holding = state.playerInfo.stockHoldings[i];
-              // currentPriceがない場合は0円として計算
               const currentPrice = state.currentPrices[name] || 0;
               stockValue += holding * currentPrice;
           });
@@ -701,8 +676,12 @@
         const msgList = document.getElementById('message-list');
         if(p.messages && p.messages.length > 0) {
           const msgsToDisplay = p.messages.slice(0, MAX_MESSAGE_ITEMS);
-          // 修正: message-itemクラスを適用して破線区切りにする
-          msgList.innerHTML = msgsToDisplay.map(m => `<li class="message-item">${m}</li>`).join('');
+          // 修正: 縦線デザインに変更 (pl-3 border-l-2 border-yellow-400)
+          msgList.innerHTML = msgsToDisplay.map(m => `
+            <li class="pl-3 border-l-2 border-yellow-400 py-1 mb-2">
+              <div class="text-gray-800">${m}</div>
+            </li>
+          `).join('');
         } else {
           msgList.innerHTML = '<li class="text-gray-400 text-xs">新着メッセージはありません</li>';
         }
@@ -717,7 +696,6 @@
         p.stockNames.forEach((name, i) => {
           if(!name) return;
           const holding = p.stockHoldings[i];
-          // 株価がない場合（ゲーム開始前）は0で表示
           const currentPrice = state.currentPrices[name] || 0;
           const valuation = holding * currentPrice;
           
@@ -727,7 +705,6 @@
           const sellDisabled = holding <= 0;
           const sellClass = sellDisabled ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-red-50 text-red-600 hover:bg-red-100";
 
-          // 価格が0の場合はハイフン表示にするなどの工夫も可能だが、ここでは0を表示
           const priceDisplay = currentPrice > 0 ? `¥ ${currentPrice.toLocaleString()}` : '---';
           const valDisplay = currentPrice > 0 ? `¥ ${valuation.toLocaleString()}` : '---';
 
