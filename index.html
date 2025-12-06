@@ -500,15 +500,6 @@
         
         if (state.pricesSchedule.length === 0) {
             document.getElementById('chart-no-data').classList.remove('hidden');
-            
-            // 【追加】データがない場合は、既存のチャートと凡例を明示的に消す
-            if (state.chart) {
-                state.chart.destroy(); // Chart.jsのインスタンスを破棄
-                state.chart = null;
-            }
-            document.getElementById('chart-legend').innerHTML = ''; // 凡例HTMLを空にする
-            state.currentPrices = {}; // 現在価格データもリセット
-            
             return; 
         } else {
             document.getElementById('chart-no-data').classList.add('hidden');
