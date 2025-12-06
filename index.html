@@ -15,7 +15,6 @@
     .card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
     
     /* アニメーション定義 */
-    /* カード全体用: 終了時はカードの背景色(white)に戻るように修正 */
     @keyframes flash-green { 
       0% { background-color: #dcfce7; box-shadow: 0 0 10px #22c55e; } 
       100% { background-color: #ffffff; box-shadow: none; } 
@@ -315,7 +314,8 @@
         historyMinutes: INITIAL_CHART_MINUTES,
         stockColors: {}, lastFetchTime: 0,
         isInitialized: false, lastDisplayedEventTime: 0,
-        lastTotalAssets: 0 // 前回総資産
+        lastTotalAssets: -1, // 初期値を-1に
+        lastRenderedCash: -1 // 表示最適化用
       };
 
       // --- アコーディオン制御 ---
@@ -325,6 +325,18 @@
           const icon = document.getElementById(iconId);
           content.classList.toggle('collapsed');
           if(icon) icon.classList.toggle('rotate');
+      };
+
+      // --- 凡例クリック時のハンドラ (グローバル公開) ---
+      window.handleLegendClick = function(name) {
+          if(state.activeStocks.has(name)) state.activeStocks.delete(name);
+          else state.activeStocks.add(name);
+          
+          const allCount = Object.keys(state.currentPrices).length;
+          const toggleAllCheckbox = document.getElementById('toggle-all-stocks');
+          if(toggleAllCheckbox) toggleAllCheckbox.checked = state.activeStocks.size === allCount;
+          
+          renderUI();
       };
 
       // --- 全選択/解除 ---
@@ -494,7 +506,6 @@
         const now = new Date();
         document.getElementById('header-clock').textContent = now.toLocaleTimeString('ja-JP');
 
-        // 1. 株価データの有無に関係なく、ポートフォリオと資産額は常に更新
         updatePortfolioUI();
         updateRealtimeAssets(); 
         
@@ -505,8 +516,17 @@
             document.getElementById('chart-no-data').classList.add('hidden');
         }
         
-        const schedule = [...state.pricesSchedule];
-        const latestEntry = schedule.slice().reverse().find(e => e.time_date <= now);
+        // 頻繁なフィルタリングを避けるため、最新エントリのチェックを軽量化
+        // 実際には時刻が変わるのでフィルタリングは必要だが、処理自体は軽い
+        const schedule = state.pricesSchedule;
+        let latestEntry = null;
+        // 後ろから探索して最初にヒットするものを探す（高速化）
+        for(let i = schedule.length - 1; i >= 0; i--) {
+            if(schedule[i].time_date <= now) {
+                latestEntry = schedule[i];
+                break;
+            }
+        }
 
         if(latestEntry) {
           const oldPrices = {...state.previousPricesForAnimation};
@@ -518,11 +538,9 @@
             state.isInitialized = true;
           }
 
-          updateChart();
+          updateChart(now);
           updateLegend(oldPrices); 
           updateEvents(now);
-          
-          // 2. 株価更新に合わせて総資産額アニメーションを発火
           updateRealtimeAssets();
         }
       }
@@ -532,44 +550,48 @@
           const cash = state.playerInfo.cash;
           let stockValue = 0;
           
-          state.playerInfo.stockNames.forEach((name, i) => {
-              const holding = state.playerInfo.stockHoldings[i];
-              const currentPrice = state.currentPrices[name] || 0;
-              stockValue += holding * currentPrice;
-          });
+          // ループ最適化
+          const names = state.playerInfo.stockNames;
+          const holdings = state.playerInfo.stockHoldings;
+          for(let i=0; i < names.length; i++) {
+              stockValue += holdings[i] * (state.currentPrices[names[i]] || 0);
+          }
 
           const total = cash + stockValue;
           
-          // --- アニメーション処理（カード全体対象） ---
-          const cardEl = document.getElementById('total-assets-card'); // 【修正】IDをカードに変更
-          
-          // クラス再付与のために一度削除してリフロー
-          cardEl.classList.remove('flash-up', 'flash-down');
-          void cardEl.offsetWidth; // 強制リフロー
+          const cardEl = document.getElementById('total-assets-card');
+          const totalEl = document.getElementById('total-assets');
+          const cashEl = document.getElementById('cash-assets');
 
-          // 前回値と比較してアニメーション
-          if (state.lastTotalAssets > 0 && total !== state.lastTotalAssets) {
-              if (total > state.lastTotalAssets) {
-                  cardEl.classList.add('flash-up');
-              } else if (total < state.lastTotalAssets) {
-                  cardEl.classList.add('flash-down');
+          // 値が変わった時だけDOM更新とアニメーション実行
+          if (state.lastTotalAssets !== total) {
+              // アニメーション処理（強制リフローは値が変わった時のみ）
+              cardEl.classList.remove('flash-up', 'flash-down');
+              void cardEl.offsetWidth; // リフロー
+              
+              if (state.lastTotalAssets > -1 && total !== state.lastTotalAssets) {
+                  if (total > state.lastTotalAssets) cardEl.classList.add('flash-up');
+                  else cardEl.classList.add('flash-down');
               }
+              
+              totalEl.textContent = `¥ ${total.toLocaleString()}`;
+              state.lastTotalAssets = total;
           }
 
-          document.getElementById('total-assets').textContent = `¥ ${total.toLocaleString()}`;
-          document.getElementById('cash-assets').textContent = `¥ ${cash.toLocaleString()}`;
-          
-          state.lastTotalAssets = total;
+          if(state.lastRenderedCash !== cash) {
+              cashEl.textContent = `¥ ${cash.toLocaleString()}`;
+              state.lastRenderedCash = cash;
+          }
       }
 
       function calculateNiceScale(min, max) {
         if (min === max) { min -= 100; max += 100; }
-        
         let rawRange = max - min;
         let tentativeMin = Math.max(0, min - (rawRange * 0.1));
         let tentativeMax = max + (rawRange * 0.1);
         let range = tentativeMax - tentativeMin;
 
+        // 計算コスト削減のため簡易的なステップ計算
         const targetSteps = 5;
         const roughStep = range / targetSteps;
         const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
@@ -587,19 +609,29 @@
         return { min: niceMin, max: niceMax, stepSize: stepSize };
       }
 
-      function updateChart() {
+      function updateChart(nowDate) {
         const ctx = document.getElementById('combined-chart').getContext('2d');
-        const now = Date.now();
+        const now = nowDate.getTime();
         const rangeMs = state.historyMinutes * 60 * 1000;
-        const filtered = state.pricesSchedule.filter(d => d.time_date.getTime() >= (now - rangeMs) && d.time_date.getTime() <= now);
+        const startTime = now - rangeMs;
+
+        // フィルタリング最適化
+        const filtered = state.pricesSchedule.filter(d => {
+            const t = d.time_date.getTime();
+            return t >= startTime && t <= now;
+        });
         
+        if(filtered.length === 0 && state.chart) return;
+
         const stockNames = Object.keys(state.currentPrices);
         const datasets = stockNames.map(name => {
           const color = getColor(name);
-          const data = filtered.map(d => {
-            const p = d.prices.find(item => item.name === name);
-            return { x: d.time_date.getTime(), y: p ? p.price : null };
-          });
+          // mapループ内で条件分岐を減らす
+          const data = new Array(filtered.length);
+          for(let i=0; i<filtered.length; i++) {
+              const p = filtered[i].prices.find(item => item.name === name);
+              data[i] = { x: filtered[i].time_date.getTime(), y: p ? p.price : null };
+          }
           return {
             label: name, data, borderColor: color, backgroundColor: color,
             borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.1,
@@ -607,25 +639,35 @@
           };
         });
 
-        let allValues = filtered.flatMap(d => d.prices.filter(p => state.activeStocks.has(p.name)).map(p => p.price));
-        if(allValues.length === 0) allValues = [1000];
+        // 最小最大計算の最適化
+        let rawMin = Infinity, rawMax = -Infinity;
+        let hasData = false;
         
-        const rawMin = Math.min(...allValues);
-        const rawMax = Math.max(...allValues);
+        for(const d of filtered) {
+            for(const p of d.prices) {
+                if(state.activeStocks.has(p.name)) {
+                    if(p.price < rawMin) rawMin = p.price;
+                    if(p.price > rawMax) rawMax = p.price;
+                    hasData = true;
+                }
+            }
+        }
+        if(!hasData) { rawMin = 900; rawMax = 1100; }
+        
         const { min, max, stepSize } = calculateNiceScale(rawMin, rawMax);
 
         const options = {
             responsive: true, maintainAspectRatio: false, animation: false,
             plugins: { legend: { display: false } },
             scales: {
-              x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'H:mm' } } },
+              x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'H:mm' } }, min: startTime, max: now },
               y: { position: 'right', min: min, max: max, ticks: { stepSize: stepSize } } 
             }
         };
 
         if (state.chart) {
           state.chart.data.datasets = datasets;
-          state.chart.options.scales.x.min = now - rangeMs;
+          state.chart.options.scales.x.min = startTime;
           state.chart.options.scales.x.max = now;
           state.chart.options.scales.y.min = min;
           state.chart.options.scales.y.max = max;
@@ -638,15 +680,26 @@
 
       function updateLegend(oldPrices) {
         const container = document.getElementById('chart-legend');
-        container.innerHTML = '';
         
         const now = new Date();
-        const reversedSchedule = state.pricesSchedule.slice().reverse();
-        const currentEntryIndex = reversedSchedule.findIndex(e => e.time_date <= now);
-        const prevEntry = (currentEntryIndex !== -1 && currentEntryIndex + 1 < reversedSchedule.length) ? reversedSchedule[currentEntryIndex + 1] : null;
+        const schedule = state.pricesSchedule;
+        let currentEntryIndex = -1;
+        // 後ろから探索
+        for(let i = schedule.length - 1; i >= 0; i--) {
+            if(schedule[i].time_date <= now) {
+                currentEntryIndex = i;
+                break;
+            }
+        }
+        
+        // 直前のデータ（変化率計算用）
+        const prevEntry = (currentEntryIndex > 0) ? schedule[currentEntryIndex - 1] : null;
 
-        Object.entries(state.currentPrices).forEach(([name, price]) => {
-          const item = document.createElement('div');
+        // HTML文字列構築による高速化
+        let htmlParts = [];
+        const entries = Object.entries(state.currentPrices);
+
+        for(const [name, price] of entries) {
           const isActive = state.activeStocks.has(name);
           const color = getColor(name);
           
@@ -669,27 +722,25 @@
              else if (price < oldPrices[name]) animClass = 'flash-down';
           }
 
-          item.className = `legend-item ${!isActive ? 'inactive' : ''} ${animClass}`;
-          item.onclick = () => {
-              if(state.activeStocks.has(name)) state.activeStocks.delete(name);
-              else state.activeStocks.add(name);
-              const allCount = Object.keys(state.currentPrices).length;
-              toggleAllCheckbox.checked = state.activeStocks.size === allCount;
-              renderUI();
-          };
-          
-          item.innerHTML = `
-            <div class="legend-left">
-                <span class="legend-color" style="background-color: ${color}"></span>
-                <span class="legend-name">${name || '名称未設定'}</span>
+          htmlParts.push(`
+            <div class="legend-item ${!isActive ? 'inactive' : ''} ${animClass}" onclick="handleLegendClick('${name}')">
+                <div class="legend-left">
+                    <span class="legend-color" style="background-color: ${color}"></span>
+                    <span class="legend-name">${name || '名称未設定'}</span>
+                </div>
+                <div class="legend-right">
+                    <div class="legend-price">¥${price.toLocaleString()}</div>
+                    <div class="legend-change ${diffColorClass}">${diffText}</div>
+                </div>
             </div>
-            <div class="legend-right">
-                <div class="legend-price">¥${price.toLocaleString()}</div>
-                <div class="legend-change ${diffColorClass}">${diffText}</div>
-            </div>
-          `;
-          container.appendChild(item);
-        });
+          `);
+        }
+        
+        const newHTML = htmlParts.join('');
+        // DOMの内容が実際に変わる場合のみ書き換える（レイアウトスラッシング防止）
+        if (container.innerHTML !== newHTML) {
+            container.innerHTML = newHTML;
+        }
       }
 
       function updatePortfolioUI() {
@@ -697,20 +748,25 @@
         const p = state.playerInfo;
 
         const msgList = document.getElementById('message-list');
+        // メッセージリスト生成
+        let msgHTML = '';
         if(p.messages && p.messages.length > 0) {
           const msgsToDisplay = p.messages.slice(0, MAX_MESSAGE_ITEMS);
-          msgList.innerHTML = msgsToDisplay.map(m => `
+          msgHTML = msgsToDisplay.map(m => `
             <li class="pl-3 border-l-2 border-yellow-400 py-1 mb-2">
               <div class="text-gray-800">${m}</div>
             </li>
           `).join('');
         } else {
-          msgList.innerHTML = '<li class="text-gray-400 text-xs">新着メッセージはありません</li>';
+          msgHTML = '<li class="text-gray-400 text-xs">新着メッセージはありません</li>';
         }
+        if(msgList.innerHTML !== msgHTML) msgList.innerHTML = msgHTML;
+
 
         const baseParams = `&${FIELD_IDS.playerName}=${encodeURIComponent(p.playerName)}&${FIELD_IDS.password}=${encodeURIComponent(p.password)}`;
         const bulkLink = `${VIEW_FORM_URL}?${FIELD_IDS.entryType}=&${FIELD_IDS.stockName}=${baseParams}`;
-        document.getElementById('bulk-order-btn').href = bulkLink;
+        const btn = document.getElementById('bulk-order-btn');
+        if(btn.getAttribute('href') !== bulkLink) btn.href = bulkLink;
 
         const tbody = document.getElementById('portfolio-table-body');
         let html = '';
@@ -729,6 +785,7 @@
 
           const priceDisplay = currentPrice > 0 ? `¥ ${currentPrice.toLocaleString()}` : '---';
           const valDisplay = currentPrice > 0 ? `¥ ${valuation.toLocaleString()}` : '---';
+          const color = getColor(name);
 
           html += `
             <tr class="hover:bg-gray-50 transition">
@@ -738,7 +795,7 @@
               </td>
               <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
-                  <div class="w-2 h-2 rounded-full mr-2" style="background-color: ${getColor(name)}"></div>
+                  <div class="w-2 h-2 rounded-full mr-2" style="background-color: ${color}"></div>
                   <div class="text-sm font-bold text-gray-900">${name}</div>
                 </div>
               </td>
@@ -754,9 +811,19 @@
 
       function updateEvents(now) {
         const list = document.getElementById('event-list');
-        const recents = state.eventsSchedule.filter(e => e.time_date <= now).reverse().slice(0, MAX_EVENT_ITEMS);
+        // 配列フィルタリングとスライスを効率化
+        let recents = [];
+        const sched = state.eventsSchedule;
+        for(let i=sched.length-1; i>=0; i--) {
+            if(sched[i].time_date <= now) {
+                recents.push(sched[i]);
+                if(recents.length >= MAX_EVENT_ITEMS) break;
+            }
+        }
+        
         if (recents.length === 0) {
-          list.innerHTML = '<li class="text-gray-400 text-xs">イベント履歴なし</li>';
+          const noDataHtml = '<li class="text-gray-400 text-xs">イベント履歴なし</li>';
+          if(list.innerHTML !== noDataHtml) list.innerHTML = noDataHtml;
           return;
         }
 
