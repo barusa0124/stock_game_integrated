@@ -15,6 +15,7 @@
     .card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
     
     /* アニメーション定義 */
+    /* カード全体用: 終了時はカードの背景色(white)に戻るように修正 */
     @keyframes flash-green { 
       0% { background-color: #dcfce7; box-shadow: 0 0 10px #22c55e; } 
       100% { background-color: #ffffff; box-shadow: none; } 
@@ -168,8 +169,15 @@
         <div class="card p-4 lg:col-span-2 flex flex-col h-auto lg:h-[600px]">
           <div class="flex justify-between items-center mb-2 border-b border-gray-100 pb-2">
             <h2 class="text-lg font-bold text-gray-800">株価推移</h2>
-            <select id="time-range-selector" class="text-sm border-gray-300 rounded shadow-sm py-1 px-2">
+            
+            <div class="flex items-center gap-3">
+              <label class="flex items-center gap-1 cursor-pointer select-none text-xs sm:text-sm text-gray-600">
+                  <input type="checkbox" id="log-scale-toggle" class="form-checkbox h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                  <span class="font-medium">対数表示</span>
+              </label>
+              <select id="time-range-selector" class="text-sm border-gray-300 rounded shadow-sm py-1 px-2">
               </select>
+            </div>
           </div>
           
           <div class="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
@@ -314,8 +322,9 @@
         historyMinutes: INITIAL_CHART_MINUTES,
         stockColors: {}, lastFetchTime: 0,
         isInitialized: false, lastDisplayedEventTime: 0,
-        lastTotalAssets: -1, // 初期値を-1に
-        lastRenderedCash: -1 // 表示最適化用
+        lastTotalAssets: -1,
+        lastRenderedCash: -1,
+        isLogScale: false // 【追加】対数表示の状態
       };
 
       // --- アコーディオン制御 ---
@@ -350,6 +359,13 @@
           renderUI();
       });
 
+      // --- 【追加】対数表示切替 ---
+      const logScaleCheckbox = document.getElementById('log-scale-toggle');
+      logScaleCheckbox.addEventListener('change', (e) => {
+          state.isLogScale = e.target.checked;
+          renderUI();
+      });
+
       // --- 手動全更新 ---
       window.manualRefreshAll = function() {
           const btn = document.getElementById('refresh-btn');
@@ -381,7 +397,16 @@
       const savedPass = sessionStorage.getItem('stock_game_pass');
       
       if(savedPlayer && savedPass) {
-          attemptLogin(savedPlayer, savedPass, true);
+          document.getElementById('login-screen').classList.add('hidden');
+          document.getElementById('dashboard-screen').classList.remove('hidden');
+          document.getElementById('display-player-name').textContent = savedPlayer;
+          
+          attemptLogin(savedPlayer, savedPass, true).then(success => {
+              if (!success) {
+                  document.getElementById('dashboard-screen').classList.add('hidden');
+                  document.getElementById('login-screen').classList.remove('hidden');
+              }
+          });
       }
 
       loginForm.addEventListener('submit', (e) => {
@@ -414,14 +439,17 @@
               const success = await fetchGameData();
               if (success) {
                   startDashboard(name);
+                  return true;
               } else {
                   if(!isAuto) alert("プレイヤー名もしくはパスワードが間違っています");
                   sessionStorage.clear(); 
+                  return false;
               }
           } catch(e) {
               console.error(e);
               if(!isAuto) alert("通信エラーが発生しました");
               sessionStorage.clear();
+              return false;
           }
       }
 
@@ -511,16 +539,19 @@
         
         if (state.pricesSchedule.length === 0) {
             document.getElementById('chart-no-data').classList.remove('hidden');
+            if (state.chart) {
+                state.chart.destroy();
+                state.chart = null;
+            }
+            document.getElementById('chart-legend').innerHTML = '';
+            state.currentPrices = {};
             return; 
         } else {
             document.getElementById('chart-no-data').classList.add('hidden');
         }
         
-        // 頻繁なフィルタリングを避けるため、最新エントリのチェックを軽量化
-        // 実際には時刻が変わるのでフィルタリングは必要だが、処理自体は軽い
         const schedule = state.pricesSchedule;
         let latestEntry = null;
-        // 後ろから探索して最初にヒットするものを探す（高速化）
         for(let i = schedule.length - 1; i >= 0; i--) {
             if(schedule[i].time_date <= now) {
                 latestEntry = schedule[i];
@@ -550,7 +581,6 @@
           const cash = state.playerInfo.cash;
           let stockValue = 0;
           
-          // ループ最適化
           const names = state.playerInfo.stockNames;
           const holdings = state.playerInfo.stockHoldings;
           for(let i=0; i < names.length; i++) {
@@ -563,11 +593,9 @@
           const totalEl = document.getElementById('total-assets');
           const cashEl = document.getElementById('cash-assets');
 
-          // 値が変わった時だけDOM更新とアニメーション実行
           if (state.lastTotalAssets !== total) {
-              // アニメーション処理（強制リフローは値が変わった時のみ）
               cardEl.classList.remove('flash-up', 'flash-down');
-              void cardEl.offsetWidth; // リフロー
+              void cardEl.offsetWidth; 
               
               if (state.lastTotalAssets > -1 && total !== state.lastTotalAssets) {
                   if (total > state.lastTotalAssets) cardEl.classList.add('flash-up');
@@ -591,7 +619,6 @@
         let tentativeMax = max + (rawRange * 0.1);
         let range = tentativeMax - tentativeMin;
 
-        // 計算コスト削減のため簡易的なステップ計算
         const targetSteps = 5;
         const roughStep = range / targetSteps;
         const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
@@ -615,7 +642,6 @@
         const rangeMs = state.historyMinutes * 60 * 1000;
         const startTime = now - rangeMs;
 
-        // フィルタリング最適化
         const filtered = state.pricesSchedule.filter(d => {
             const t = d.time_date.getTime();
             return t >= startTime && t <= now;
@@ -626,7 +652,6 @@
         const stockNames = Object.keys(state.currentPrices);
         const datasets = stockNames.map(name => {
           const color = getColor(name);
-          // mapループ内で条件分岐を減らす
           const data = new Array(filtered.length);
           for(let i=0; i<filtered.length; i++) {
               const p = filtered[i].prices.find(item => item.name === name);
@@ -639,7 +664,6 @@
           };
         });
 
-        // 最小最大計算の最適化
         let rawMin = Infinity, rawMax = -Infinity;
         let hasData = false;
         
@@ -656,22 +680,45 @@
         
         const { min, max, stepSize } = calculateNiceScale(rawMin, rawMax);
 
+        // 【修正】対数表示の場合の最小値設定（0以下はNG）
+        let chartMin = min;
+        if (state.isLogScale && chartMin <= 0) chartMin = 1;
+
+        const scaleType = state.isLogScale ? 'logarithmic' : 'linear';
+        
         const options = {
             responsive: true, maintainAspectRatio: false, animation: false,
             plugins: { legend: { display: false } },
             scales: {
               x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'H:mm' } }, min: startTime, max: now },
-              y: { position: 'right', min: min, max: max, ticks: { stepSize: stepSize } } 
+              y: { 
+                  position: 'right', 
+                  type: scaleType, 
+                  min: chartMin, 
+                  max: max 
+              } 
             }
         };
+
+        // 線形スケールの場合のみステップサイズを適用（対数で設定するとバグるため）
+        if (!state.isLogScale) {
+            options.scales.y.ticks = { stepSize: stepSize };
+        }
 
         if (state.chart) {
           state.chart.data.datasets = datasets;
           state.chart.options.scales.x.min = startTime;
           state.chart.options.scales.x.max = now;
-          state.chart.options.scales.y.min = min;
+          state.chart.options.scales.y.min = chartMin;
           state.chart.options.scales.y.max = max;
-          state.chart.options.scales.y.ticks.stepSize = stepSize;
+          state.chart.options.scales.y.type = scaleType;
+          
+          if(!state.isLogScale) {
+             state.chart.options.scales.y.ticks = { stepSize: stepSize };
+          } else {
+             delete state.chart.options.scales.y.ticks;
+          }
+
           state.chart.update('none');
         } else {
           state.chart = new Chart(ctx, { type: 'line', data: { datasets }, options: options });
@@ -684,7 +731,6 @@
         const now = new Date();
         const schedule = state.pricesSchedule;
         let currentEntryIndex = -1;
-        // 後ろから探索
         for(let i = schedule.length - 1; i >= 0; i--) {
             if(schedule[i].time_date <= now) {
                 currentEntryIndex = i;
@@ -692,10 +738,8 @@
             }
         }
         
-        // 直前のデータ（変化率計算用）
         const prevEntry = (currentEntryIndex > 0) ? schedule[currentEntryIndex - 1] : null;
 
-        // HTML文字列構築による高速化
         let htmlParts = [];
         const entries = Object.entries(state.currentPrices);
 
@@ -737,7 +781,6 @@
         }
         
         const newHTML = htmlParts.join('');
-        // DOMの内容が実際に変わる場合のみ書き換える（レイアウトスラッシング防止）
         if (container.innerHTML !== newHTML) {
             container.innerHTML = newHTML;
         }
@@ -748,7 +791,6 @@
         const p = state.playerInfo;
 
         const msgList = document.getElementById('message-list');
-        // メッセージリスト生成
         let msgHTML = '';
         if(p.messages && p.messages.length > 0) {
           const msgsToDisplay = p.messages.slice(0, MAX_MESSAGE_ITEMS);
@@ -811,7 +853,6 @@
 
       function updateEvents(now) {
         const list = document.getElementById('event-list');
-        // 配列フィルタリングとスライスを効率化
         let recents = [];
         const sched = state.eventsSchedule;
         for(let i=sched.length-1; i>=0; i--) {
