@@ -15,7 +15,6 @@
     .card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
     
     /* アニメーション定義 */
-    /* カード全体用: 終了時はカードの背景色(white)に戻るように修正 */
     @keyframes flash-green { 
       0% { background-color: #dcfce7; box-shadow: 0 0 10px #22c55e; } 
       100% { background-color: #ffffff; box-shadow: none; } 
@@ -324,7 +323,7 @@
         isInitialized: false, lastDisplayedEventTime: 0,
         lastTotalAssets: -1,
         lastRenderedCash: -1,
-        isLogScale: false // 【追加】対数表示の状態
+        isLogScale: false // 対数表示の状態
       };
 
       // --- アコーディオン制御 ---
@@ -359,7 +358,7 @@
           renderUI();
       });
 
-      // --- 【追加】対数表示切替 ---
+      // --- 対数表示切替 ---
       const logScaleCheckbox = document.getElementById('log-scale-toggle');
       logScaleCheckbox.addEventListener('change', (e) => {
           state.isLogScale = e.target.checked;
@@ -678,11 +677,23 @@
         }
         if(!hasData) { rawMin = 900; rawMax = 1100; }
         
-        const { min, max, stepSize } = calculateNiceScale(rawMin, rawMax);
+        // 【修正】スケール計算を分岐
+        let chartMin, chartMax, chartStepSize;
 
-        // 【修正】対数表示の場合の最小値設定（0以下はNG）
-        let chartMin = min;
-        if (state.isLogScale && chartMin <= 0) chartMin = 1;
+        if (state.isLogScale) {
+            // 対数表示：マージンを小さく取り、下限をデータに合わせて持ち上げる
+            // 0以下にならないよう保護
+            chartMin = rawMin * 0.95; 
+            chartMax = rawMax * 1.05;
+            if (chartMin <= 0) chartMin = 1;
+            chartStepSize = undefined; // ステップサイズは自動
+        } else {
+            // 線形表示：Nice Scale計算を使用
+            const scale = calculateNiceScale(rawMin, rawMax);
+            chartMin = scale.min;
+            chartMax = scale.max;
+            chartStepSize = scale.stepSize;
+        }
 
         const scaleType = state.isLogScale ? 'logarithmic' : 'linear';
         
@@ -695,14 +706,13 @@
                   position: 'right', 
                   type: scaleType, 
                   min: chartMin, 
-                  max: max 
+                  max: chartMax 
               } 
             }
         };
 
-        // 線形スケールの場合のみステップサイズを適用（対数で設定するとバグるため）
-        if (!state.isLogScale) {
-            options.scales.y.ticks = { stepSize: stepSize };
+        if (!state.isLogScale && chartStepSize) {
+            options.scales.y.ticks = { stepSize: chartStepSize };
         }
 
         if (state.chart) {
@@ -710,11 +720,11 @@
           state.chart.options.scales.x.min = startTime;
           state.chart.options.scales.x.max = now;
           state.chart.options.scales.y.min = chartMin;
-          state.chart.options.scales.y.max = max;
+          state.chart.options.scales.y.max = chartMax;
           state.chart.options.scales.y.type = scaleType;
           
-          if(!state.isLogScale) {
-             state.chart.options.scales.y.ticks = { stepSize: stepSize };
+          if(!state.isLogScale && chartStepSize) {
+             state.chart.options.scales.y.ticks = { stepSize: chartStepSize };
           } else {
              delete state.chart.options.scales.y.ticks;
           }
